@@ -2,7 +2,7 @@
 
 > **CS 2031 · Desarrollo Basado en Plataforma**  
 > **Proyecto 1 · Semana 7 — Backend completo**  
-> **Equipo:** [NOMBRE DEL INTEGRANTE 1] · [NOMBRE DEL INTEGRANTE 2] · [NOMBRE DEL INTEGRANTE 3] · [NOMBRE DEL INTEGRANTE 4]  
+> **Equipo:** Manuel Aguirre · Geannyra Cortez · Jennifer Patiño · Jossue Caceres
 > **Repositorio:** [URL DEL REPOSITORIO]  
 > **Deployment:** [URL DEL DEPLOYMENT]  
 > **Swagger:** [URL SWAGGER]

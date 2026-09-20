@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/loyalty-programs")
+@RequestMapping("/api/v1/loyalty-programs")
 public class LoyaltyProgramController {
 
     private final LoyaltyProgramService loyaltyProgramService;

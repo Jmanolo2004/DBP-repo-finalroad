@@ -23,7 +23,7 @@ public class AppUser {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private Role role;
+    private Role role = Role.BRAND_ADMIN;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -32,7 +32,7 @@ public class AppUser {
     @JoinColumn(name = "business_id", nullable = false)
     private Business business;
 
-    protected AppUser() { }
+    public AppUser() { }
 
     // Getters
     public Long getId() {
@@ -44,10 +44,39 @@ public class AppUser {
     }
 
     public String getPassword() {
-        return passwordHash; // Conecta el contrato de Spring Security con tu campo passwordHash
+        return passwordHash;
     }
 
     public Role getRole() {
         return role;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public Business getBusiness() {
+        return business;
+    }
+
+    // Setters
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public void setPassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public void setBusiness(Business business) {
+        this.business = business;
     }
 }

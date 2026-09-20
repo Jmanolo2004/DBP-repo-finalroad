@@ -1,0 +1,16 @@
+com\fidegresa\model\CardTransaction.class
+com\fidegresa\model\GeoCampaign.class
+com\fidegresa\FidegresaApplication.class
+com\fidegresa\model\Business.class
+com\fidegresa\model\Role.class
+com\fidegresa\model\NotificationLog.class
+com\fidegresa\model\LoyaltyCard.class
+com\fidegresa\model\TransactionType.class
+com\fidegresa\model\RefreshToken.class
+com\fidegresa\model\Reward.class
+com\fidegresa\model\Branch.class
+com\fidegresa\model\Customer.class
+com\fidegresa\model\AppUser.class
+com\fidegresa\model\PasswordResetToken.class
+com\fidegresa\model\CardStatus.class
+com\fidegresa\model\LoyaltyProgram.class

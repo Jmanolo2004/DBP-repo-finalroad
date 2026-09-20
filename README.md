@@ -4,7 +4,8 @@
 > **Proyecto 1 · Semana 7 — Backend completo**  
 > **Equipo:** Manuel Aguirre · Geannyra Cortez · Jennifer Patiño · Jossue Caceres
 > 
-> **Repositorio:** ** https://github.com/Jmanolo2004/DBP-repo-finalroad **
+> **Repositorio:** https://github.com/Jmanolo2004/DBP-repo-finalroad
+> 
 > **Deployment:** [URL DEL DEPLOYMENT]  
 > **Swagger:** [URL SWAGGER]
 

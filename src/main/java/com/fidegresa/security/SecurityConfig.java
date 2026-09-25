@@ -40,8 +40,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/public/**").permitAll() // Rutas públicas de registro y login
-                        .anyRequest().authenticated() // El resto requiere autenticación
+                        .requestMatchers("/api/v1/auth/**", "/api/v1/businesses/**", "/api/auth/**", "/api/public/**").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())

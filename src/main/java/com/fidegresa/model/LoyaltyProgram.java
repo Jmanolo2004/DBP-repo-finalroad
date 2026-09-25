@@ -42,4 +42,11 @@ public class LoyaltyProgram {
     public String getDescription() { return description; }
     public int getRequiredStamps() { return requiredStamps; }
     public Business getBusiness() { return business; }
+
+    // --- ¡AQUÍ ESTÁN LOS SETTERS QUE FALTABAN! ---
+    public void setId(Long id) { this.id = id; }
+    public void setName(String name) { this.name = name; }
+    public void setDescription(String description) { this.description = description; }
+    public void setRequiredStamps(int requiredStamps) { this.requiredStamps = requiredStamps; }
+    public void setBusiness(Business business) { this.business = business; }
 }

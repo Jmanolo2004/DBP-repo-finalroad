@@ -34,7 +34,6 @@ public class LoyaltyProgramService {
         // Asignación de campos básicos
         program.setName(request.getName());
         program.setDescription(request.getDescription());
-        // Nota: Para asociar el business_id, posteriormente lo vincularemos con el repositorio de Business
 
         LoyaltyProgram savedProgram = loyaltyProgramRepository.save(program);
         return loyaltyProgramMapper.toResponse(savedProgram);

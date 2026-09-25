@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -42,11 +43,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
-    // HTTP 401 - Unauthorized
-    @ExceptionHandler({UnauthorizedException.class, TokenExpiredException.class})
+    // HTTP 401 - Unauthorized (Incluyendo BadCredentialsException de Spring Security)
+    @ExceptionHandler({UnauthorizedException.class, TokenExpiredException.class, BadCredentialsException.class})
     public ResponseEntity<ErrorResponseDto> handleUnauthorized(RuntimeException ex, HttpServletRequest request) {
         ErrorResponseDto error = new ErrorResponseDto(
-                LocalDateTime.now(), HttpStatus.UNAUTHORIZED.value(), "Unauthorized", ex.getMessage(), request.getRequestURI()
+                LocalDateTime.now(), HttpStatus.UNAUTHORIZED.value(), "Unauthorized", "Credenciales inválidas", request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }

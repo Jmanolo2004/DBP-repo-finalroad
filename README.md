@@ -386,6 +386,36 @@ Este proyecto se distribuye bajo la licencia: **MIT**.
 | REST | `/api/v1`, recursos plurales y códigos HTTP apropiados |
 | Eventos | 7 eventos con listeners transaccionales |
 | Async | `@Async` + `ThreadPoolTaskExecutor` |
+
+
+
+## 🚀 Despliegue en AWS
+
+La API está desplegada en la nube de AWS:
+
+**URL base:** http://52.201.102.208:8080
+
+### Arquitectura
+| Componente | Servicio | Detalle |
+|---|---|---|
+| Servidor | Amazon EC2 | Amazon Linux 2023, t3.small, Java 21 (Corretto) |
+| Base de datos | Amazon RDS | PostgreSQL 18, db.t4g.micro |
+| IP fija | Elastic IP | 52.201.102.208 |
+| Región | us-east-1 | Norte de Virginia |
+
+### Endpoints principales
+| Método | Endpoint | Descripción |
+|---|---|---|
+| POST | /api/auth/register | Registrar usuario |
+| POST | /api/auth/login | Iniciar sesión (devuelve JWT) |
+| GET | /api/auth/me | Datos del usuario autenticado (requiere token) |
+
+### Despliegue Amazon Web Services
+Usar Postman con la variable `base_url = http://52.201.102.208:8080`.
+Las rutas protegidas requieren el header `Authorization: Bearer <token>`.
+
+> **Nota:** el despliegue corre en AWS Academy Learner Lab, por lo que el
+> servidor solo está disponible mientras el laboratorio esté activo.
 | Email | JavaMailSender + Thymeleaf + manejo asíncrono |
 | Deployment | AWS EC2 + RDS |
 | Git | GitFlow, PRs, reviews y CI |

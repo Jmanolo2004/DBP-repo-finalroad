@@ -1,12 +1,12 @@
-# Fidegresa.GO — Backend
+<img width="1600" height="771" alt="image" src="https://github.com/user-attachments/assets/171a9351-ee92-47f4-8c67-9d4643742f26" /># Fidegresa.GO — Backend
 
 > **CS 2031 · Desarrollo Basado en Plataforma**  
 > **Proyecto 1 · Semana 7 — Backend completo**  
 > **Equipo:** Manuel Aguirre · Geannyra Cortez · Jennifer Patiño · Jossue Caceres
-> 
+>
 > **Repositorio:** [https://github.com/Jmanolo2004/DBP-repo-finalroad](https://github.com/Jmanolo2004/DBP-repo-finalroad)  
-> **Deployment:** []  
-> **Swagger:** []
+> **Deployment (AWS):** [http://52.201.102.208:8080/api/v1](http://52.201.102.208:8080/api/v1)  
+> **Swagger:** [http://52.201.102.208:8080/swagger-ui/index.html](http://52.201.102.208:8080/swagger-ui/index.html)
 
 ---
 
@@ -84,11 +84,10 @@ La solución también contempla GeoPush. El backend almacena las coordenadas de 
 - JUnit 5 + Mockito
 - Testcontainers
 - JaCoCo
-- Docker / Docker Compose
 - GitHub Actions
-- AWS EC2 + RDS
+- AWS EC2 + RDS PostgreSQL + Elastic IP
 
-Las credenciales y secretos se manejan mediante variables de entorno. El archivo `.env` y certificados no deben formar parte del repositorio.
+Las credenciales y secretos del entorno productivo se manejan mediante variables de entorno en el servidor (ver [11.2](#112-variables-de-entorno)). El archivo `.env`, certificados y contraseñas reales no deben formar parte del repositorio.
 
 ---
 
@@ -261,7 +260,7 @@ GitHub Projects organiza el trabajo mediante:
 
 Cada tarea se registra como Issue con responsable y fecha. Se utilizan labels como `feature`, `security`, `bug`, `devops`, `docs` y `test`, además de milestones por fase.
 
-GitHub Actions ejecuta CI en cada Pull Request, compilando y probando el proyecto. El flujo de producción construye la imagen Docker y la despliega en EC2 usando GitHub Secrets.
+GitHub Actions ejecuta CI en cada push y Pull Request: compila el proyecto con Maven y ejecuta las pruebas. El despliegue a producción se realiza en AWS EC2 (ver [11.5](#115-deployment-en-aws)).
 
 ---
 
@@ -269,11 +268,11 @@ GitHub Actions ejecuta CI en cada Pull Request, compilando y probando el proyect
 
 Fidegresa.GO propone un backend completo para administrar programas de fidelización mediante tarjetas digitales y QR. La solución integra la administración de comercios, sucursales, cajeros, programas, clientes, tarjetas, recompensas, transacciones y campañas.
 
-El desarrollo aplica persistencia con JPA, arquitectura por capas, DTOs, excepciones globales, JWT, autorización por roles, eventos, asincronía y despliegue cloud.
+El desarrollo aplica persistencia con JPA, arquitectura por capas, DTOs, excepciones globales, JWT, autorización por roles, eventos, asincronía y despliegue cloud en AWS.
 
 Entre los principales aprendizajes se encuentran la importancia de separar responsabilidades, proteger los datos sensibles, utilizar correctamente los códigos HTTP y desacoplar procesos externos mediante eventos asíncronos.
 
-Como trabajo futuro se puede ampliar la integración con proveedores de Wallet, incorporar almacenamiento de logos mediante S3 y continuar fortaleciendo métricas, pruebas, observabilidad y automatización.
+Como trabajo futuro se puede ampliar la integración con proveedores de Wallet, incorporar almacenamiento de logos mediante S3, automatizar el despliegue con GitHub Actions y continuar fortaleciendo métricas, pruebas y observabilidad.
 
 ---
 
@@ -284,60 +283,51 @@ Como trabajo futuro se puede ampliar la integración con proveedores de Wallet, 
 Requisitos:
 
 - Java 21
-- Docker y Docker Compose
-- Maven Wrapper
+- Maven 3.8+
+- PostgreSQL 15+ con una base de datos creada (por ejemplo `fidegresa_db`)
 
-Ejecutar:
-
-```bash
-docker compose up -d
-./mvnw spring-boot:run
-```
-
-Para validar el proyecto:
+Configurar la conexión en `src/main/resources/application.properties` o mediante las variables de entorno de la sección 11.2, y ejecutar:
 
 ```bash
-./mvnw clean verify
+mvn spring-boot:run
 ```
 
-La configuración local debe utilizar PostgreSQL y Mailpit definidos en `docker-compose.yml`.
+Para compilar y ejecutar las pruebas:
+
+```bash
+mvn clean verify
+```
 
 ### 11.2 Variables de entorno
 
-Crear la configuración a partir de `.env.example`. Nunca subir `.env`, certificados ni credenciales reales.
+Spring Boot reemplaza automáticamente cualquier propiedad de `application.properties` por una variable de entorno con el mismo nombre en mayúsculas y con `_` (por ejemplo, `spring.datasource.url` → `SPRING_DATASOURCE_URL`). Así, el mismo código funciona en local y en AWS sin modificaciones.
 
-Variables esperadas:
+Variables utilizadas en producción:
 
 ```text
-DB_URL=
-DB_USERNAME=
-DB_PASSWORD=
-JWT_SECRET=
-CORS_ALLOWED_ORIGINS=
-MAIL_HOST=
-MAIL_PORT=
-MAIL_USERNAME=
-MAIL_PASSWORD=
-GOOGLE_WALLET_CREDENTIALS=
-APPLE_WALLET_ENABLED=
+SPRING_DATASOURCE_URL=jdbc:postgresql://<endpoint-rds>:5432/finalroad?sslmode=require
+SPRING_DATASOURCE_USERNAME=
+SPRING_DATASOURCE_PASSWORD=
+SPRING_MAIL_USERNAME=
+SPRING_MAIL_PASSWORD=
 ```
+
+Nunca subir `.env`, certificados ni credenciales reales al repositorio.
 
 ### 11.3 Endpoints principales
 
-| Módulo | Endpoints principales |
-|---|---|
-| Auth | `/api/v1/auth/register`, `/login`, `/refresh`, `/logout`, `/forgot-password`, `/reset-password` |
-| Business | `/api/v1/businesses/me`, `/api/v1/businesses`, `/api/v1/businesses/{id}/status` |
-| Branches | `/api/v1/branches` |
-| Cashiers | `/api/v1/users/cashiers`, `/api/v1/users/{id}/branches`, `/api/v1/users/{id}/status` |
-| Programs | `/api/v1/loyalty-programs`, `/api/v1/loyalty-programs/{id}/rewards` |
-| Public | `/api/v1/public/loyalty-programs/{code}`, `/api/v1/public/loyalty-cards/{serial}/apple-pass` |
-| Transactions | `/api/v1/stamps`, `/api/v1/redemptions` |
-| Cards/Customers | `/api/v1/loyalty-cards`, `/api/v1/customers` |
-| GeoPush | `/api/v1/geo-campaigns` |
-| Metrics | `/api/v1/metrics/summary?from&to&branchId` |
+Todas las rutas están versionadas bajo `/api/v1`.
 
-La colección completa se entrega en `postman_collection.json` en la raíz del repositorio.
+| Método | Endpoint | Descripción | Auth |
+|---|---|---|---|
+| POST | `/api/v1/auth/register` | Registrar usuario asociado a un negocio | Pública |
+| POST | `/api/v1/auth/login` | Iniciar sesión (devuelve JWT) | Pública |
+| GET | `/api/v1/auth/me` | Datos del usuario autenticado | Bearer token |
+| — | `/api/v1/businesses` | Gestión de negocios | Bearer token |
+| — | `/api/v1/customers` | Gestión de clientes | Bearer token |
+| — | `/api/v1/loyalty-programs` | Gestión de programas de fidelización | Bearer token |
+
+La colección de Postman se encuentra en la carpeta [`postman/`](postman/) del repositorio.
 
 ### 11.4 Equipo
 
@@ -346,15 +336,78 @@ La colección completa se entrega en `postman_collection.json` en la raíz del r
 | **Manuel Aguirre** | Seguridad, usuarios, JWT, autenticación, excepciones y coordinación comercial/técnica |
 | **Geannyra Cortez** | Business, Branch, Program, Reward, Customer, Card, sellos, canjes y métricas |
 | **Jennifer Patiño** | Eventos, asincronía, correo, Wallet, GeoPush y auditoría |
-| **Jossue Caceres** | Docker, CI/CD, AWS, tests, JaCoCo, Swagger, Postman y despliegue |
+| **Jossue Caceres** | CI/CD, AWS, tests, JaCoCo, Swagger, Postman y despliegue |
 
-### 11.5 Deployment
+### 11.5 Deployment en AWS
 
-**AWS:** EC2 + RDS PostgreSQL  
-**URL pública:** [http://tu-ip-o-dominio-ec2:8080/api/v1](http://tu-ip-o-dominio-ec2:8080/api/v1)  
-**Swagger:** [http://tu-ip-o-dominio-ec2:8080/swagger-ui/index.html](http://tu-ip-o-dominio-ec2:8080/swagger-ui/index.html)
+La API está desplegada en AWS (AWS Academy Learner Lab):
 
-RDS debe permanecer sin acceso público. El acceso al puerto 5432 debe limitarse al Security Group de EC2. EC2 expone los puertos públicos necesarios y protege SSH mediante las IPs autorizadas.
+| Recurso | Valor |
+|---|---|
+| **URL base** | [http://52.201.102.208:8080/api/v1](http://52.201.102.208:8080/api/v1) |
+| **Swagger** | [http://52.201.102.208:8080/swagger-ui/index.html](http://52.201.102.208:8080/swagger-ui/index.html) |
+
+#### Arquitectura de despliegue
+
+| Componente | Servicio | Detalle |
+|---|---|---|
+| Servidor | Amazon EC2 | Amazon Linux 2023, `t3.small`, Java 21 (Amazon Corretto) |
+| Base de datos | Amazon RDS | PostgreSQL 18, `db.t4g.micro`, sin acceso público |
+| IP fija | Elastic IP | `52.201.102.208` |
+| Región | `us-east-1` | Norte de Virginia |
+
+```mermaid
+flowchart LR
+    User[Cliente / Postman] -->|HTTP :8080| EC2[EC2 · Spring Boot<br/>Elastic IP 52.201.102.208]
+    EC2 -->|JDBC + SSL :5432| RDS[(RDS PostgreSQL<br/>acceso privado)]
+```
+
+#### Seguridad de red
+
+- **RDS** no tiene acceso público. El puerto 5432 solo acepta conexiones desde el Security Group de la instancia EC2 (`ec2-rds-1` → `rds-ec2-1`).
+- **EC2** (`backend-sg`) expone el puerto **8080** para la API y el **22** para administración mediante EC2 Instance Connect.
+- La conexión entre la API y la base de datos usa **SSL** (`sslmode=require`).
+- Las credenciales de la base de datos se configuran en el servidor mediante un archivo de variables de entorno con permisos restringidos (`chmod 600`), fuera del repositorio.
+
+#### Proceso de despliegue
+
+1. Instalación de Java 21, Maven y Git en EC2.
+2. Clonado del repositorio y compilación con `mvn clean package -DskipTests`.
+3. Configuración de variables de entorno en `/etc/fidegresa.env`.
+4. Ejecución como servicio `systemd` (`fidegresa.service`), con reinicio automático y arranque junto con el servidor.
+
+Para actualizar la aplicación tras un nuevo push:
+
+```bash
+cd ~/DBP-repo-finalroad
+git pull
+mvn clean package -DskipTests
+sudo systemctl restart fidegresa
+```
+
+#### Cómo probar
+
+Usar Postman con la variable `base_url = http://52.201.102.208:8080`. Las rutas protegidas requieren el header `Authorization: Bearer <token>`.
+
+El registro requiere un negocio existente (`businessId`). En el entorno desplegado existe el negocio de demostración **Fidegresa Demo** con `id = 1`.
+
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "usuario@ejemplo.com",
+  "password": "MiPassword123$",
+  "businessId": 1
+}
+```
+
+Flujo sugerido: **Register** (201) → **Login** (200, devuelve token) → **Me** con Bearer token (200).
+
+> **Nota:** el despliegue corre en AWS Academy Learner Lab, por lo que el servidor solo está disponible mientras el laboratorio esté activo. Al iniciar el laboratorio, la instancia y la base de datos se encienden y la API arranca automáticamente.
+
+
+
 
 ### 11.6 Licencia
 
@@ -386,39 +439,22 @@ Este proyecto se distribuye bajo la licencia: **MIT**.
 | REST | `/api/v1`, recursos plurales y códigos HTTP apropiados |
 | Eventos | 7 eventos con listeners transaccionales |
 | Async | `@Async` + `ThreadPoolTaskExecutor` |
-
-
-
-## 🚀 Despliegue en AWS
-
-La API está desplegada en la nube de AWS:
-
-**URL base:** http://52.201.102.208:8080
-
-### Arquitectura
-| Componente | Servicio | Detalle |
-|---|---|---|
-| Servidor | Amazon EC2 | Amazon Linux 2023, t3.small, Java 21 (Corretto) |
-| Base de datos | Amazon RDS | PostgreSQL 18, db.t4g.micro |
-| IP fija | Elastic IP | 52.201.102.208 |
-| Región | us-east-1 | Norte de Virginia |
-
-### Endpoints principales
-| Método | Endpoint | Descripción |
-|---|---|---|
-| POST | /api/auth/register | Registrar usuario |
-| POST | /api/auth/login | Iniciar sesión (devuelve JWT) |
-| GET | /api/auth/me | Datos del usuario autenticado (requiere token) |
-
-### Despliegue Amazon Web Services
-Usar Postman con la variable `base_url = http://52.201.102.208:8080`.
-Las rutas protegidas requieren el header `Authorization: Bearer <token>`.
-
-> **Nota:** el despliegue corre en AWS Academy Learner Lab, por lo que el
-> servidor solo está disponible mientras el laboratorio esté activo.
 | Email | JavaMailSender + Thymeleaf + manejo asíncrono |
-| Deployment | AWS EC2 + RDS |
-| Git | GitFlow, PRs, reviews y CI |
+| Deployment | AWS EC2 + RDS PostgreSQL + Elastic IP, servicio `systemd`, evidencias en [11.5](#115-deployment-en-aws) |
+| Git | GitFlow, PRs, reviews y CI con GitHub Actions |
 | Management | GitHub Projects, Issues, labels y milestones |
-| Bonus | Swagger, logging, paginación, filtros, tests, Docker Compose y CI/CD |
+| Bonus | Swagger, logging, paginación, filtros y tests |
+
+
+#### Evidencias de pruebas
+
+**Registro de usuario — 201 Created**
+<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/955953a5-2f04-4118-adc0-2d017e55a643" />
+
+
+**Login — 200 OK**
+<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/4a8d73c4-9ac7-4015-8482-35fa43072040" />
+
+**Usuario autenticado `/me` — 200 OK**
+<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/220b5c59-a380-4db3-9c5c-cd4aa0c35e22" />
 

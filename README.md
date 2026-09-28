@@ -1,5 +1,3 @@
-<img width="1600" height="771" alt="image" src="https://github.com/user-attachments/assets/171a9351-ee92-47f4-8c67-9d4643742f26" /># Fidegresa.GO — Backend
-
 > **CS 2031 · Desarrollo Basado en Plataforma**  
 > **Proyecto 1 · Semana 7 — Backend completo**  
 > **Equipo:** Manuel Aguirre · Geannyra Cortez · Jennifer Patiño · Jossue Caceres

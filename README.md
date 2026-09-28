@@ -1,4 +1,4 @@
-**Fidegresa.GO — Backend**  
+## Fidegresa.GO — Backend
 > **CS 2031 · Desarrollo Basado en Plataforma**  
 > **Proyecto 1 · Semana 7 — Backend completo**  
 > **Equipo:** Manuel Aguirre · Geannyra Cortez · Jennifer Patiño · Jossue Caceres

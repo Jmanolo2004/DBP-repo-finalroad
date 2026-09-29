@@ -447,16 +447,6 @@ Este proyecto se distribuye bajo la licencia: **MIT**.
 
 #### Evidencias de pruebas
 
-**Registro de usuario — 201 Created**
-<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/955953a5-2f04-4118-adc0-2d017e55a643" />
-
-
-**Login — 200 OK**
-<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/4a8d73c4-9ac7-4015-8482-35fa43072040" />
-
-**Usuario autenticado `/me` — 200 OK**
-<img width="1600" height="899" alt="image" src="https://github.com/user-attachments/assets/220b5c59-a380-4db3-9c5c-cd4aa0c35e22" />
-
 **Funcionamiento de RDS y EC2 en AWS**
 <img width="1600" height="776" alt="image" src="https://github.com/user-attachments/assets/b4551989-b632-4c41-a158-2a0bbc1024bf" />
 <img width="1600" height="771" alt="image" src="https://github.com/user-attachments/assets/f0e73322-ea1f-493f-9702-8d505989acf0" />

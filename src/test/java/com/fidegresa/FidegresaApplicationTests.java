@@ -1,4 +1,12 @@
 package com.fidegresa;
 
-public class FidegresaApplicationTests {
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class FidegresaApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
 }

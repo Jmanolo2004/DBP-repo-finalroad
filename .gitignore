@@ -1,0 +1,12 @@
+# Compilación de Maven
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Otros
+*.class
+*.log
+.DS_Store
+.env

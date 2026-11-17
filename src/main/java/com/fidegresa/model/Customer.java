@@ -1,44 +1,65 @@
 package com.fidegresa.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import java.util.ArrayList;
-import java.util.List;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+import java.time.Instant;
+
+/** Cliente de un negocio. Sus visitas y saldos salen de sus movimientos y tarjetas. */
 @Entity
-@Table(name = "customers", indexes = @Index(name = "idx_customer_email", columnList = "email", unique = true))
+@Table(name = "customers", indexes = {
+        @Index(name = "idx_customer_business_email", columnList = "business_id,email", unique = true),
+        @Index(name = "idx_customer_branch", columnList = "branch_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
 public class Customer {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
     @Column(nullable = false, length = 120)
     private String fullName;
 
-    @NotBlank @Email
-    @Column(nullable = false, unique = true, length = 160)
+    @Column(nullable = false, length = 160)
     private String email;
 
-    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
-    private List<LoyaltyCard> cards = new ArrayList<>();
+    @Column(length = 30)
+    private String phone = "";
 
-    public void setFullName(String fullName) { this.fullName = fullName; }
-    public void setEmail(String email) { this.email = email; }
+    /** Formato dd/MM, opcional. */
+    @Column(length = 5)
+    private String birthday;
 
-    // Constructor vacío público para permitir el mapeo externo
-    public Customer() { }
+    @Column(nullable = false)
+    private double latitude;
 
-    // Getters
-    public Long getId() {
-        return id;
-    }
+    @Column(nullable = false)
+    private double longitude;
 
-    public String getFullName() {
-        return fullName;
-    }
+    @Column(nullable = false)
+    private int mapX;
 
-    public String getEmail() {
-        return email;
-    }
+    @Column(nullable = false)
+    private int mapY;
+
+    @Column(nullable = false)
+    private boolean locationConsent = true;
+
+    @Column(nullable = false)
+    private boolean notificationsEnabled = true;
+
+    @Column(nullable = false)
+    private Instant registeredAt = Instant.now();
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "branch_id", nullable = false)
+    private Branch branch;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "business_id", nullable = false)
+    private Business business;
 }

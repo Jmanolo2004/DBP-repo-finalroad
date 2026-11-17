@@ -1,50 +1,54 @@
 package com.fidegresa.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import java.util.ArrayList;
-import java.util.List;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Negocio (cuenta) dueño de los datos. Todo lo demás se filtra por este negocio. */
 @Entity
-@Table(name = "businesses", indexes = @Index(name = "idx_business_slug", columnList = "slug", unique = true))
+@Table(name = "businesses")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Business {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
-    @Size(max = 120)
     @Column(nullable = false, length = 120)
     private String name;
 
-    @NotBlank
-    @Size(max = 80)
-    @Column(nullable = false, length = 80, unique = true)
-    private String slug;
+    /** emprende, crece o avanza */
+    @Column(nullable = false, length = 20)
+    private String planId = "emprende";
 
-    @Size(max = 160)
-    @Column(length = 160)
-    private String email;
+    @Column(nullable = false, length = 10)
+    private String theme = "claro";
 
-    @OneToMany(mappedBy = "business", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Branch> branches = new ArrayList<>();
+    @Column(length = 30)
+    private String phone = "";
 
-    @OneToMany(mappedBy = "business", fetch = FetchType.LAZY)
-    private List<AppUser> users = new ArrayList<>();
+    @Column(nullable = false, length = 7)
+    private String primaryColor = "#603f2a";
 
-    @OneToMany(mappedBy = "business", fetch = FetchType.LAZY)
-    private List<LoyaltyProgram> programs = new ArrayList<>();
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "json")
+    private Map<String, Boolean> notices = new LinkedHashMap<>(Map.of(
+            "inactivos", true, "localesEnPausa", true, "resenas", true, "cumpleanos", true));
 
-    @OneToMany(mappedBy = "business", fetch = FetchType.LAZY)
-    private List<GeoCampaign> campaigns = new ArrayList<>();
+    /** Radio de alcance (metros) y local elegido en Geolocalización. */
+    @Column(nullable = false)
+    private int geoRadius = 500;
 
-    // Constructor vacío público
-    public Business() { }
+    private Long geoBranchId;
 
-    // Getters
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public String getEmail() { return email; }
-    public String getSlug() { return slug; }
+    @Column(nullable = false)
+    private Instant createdAt = Instant.now();
 }

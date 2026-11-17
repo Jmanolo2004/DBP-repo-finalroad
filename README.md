@@ -9,6 +9,60 @@
 
 ---
 
+## Proyecto 2 · Backend conectado a la web y a la app de caja
+
+Esta versión reemplaza los datos de demostración del frontend: la web y la app móvil leen y guardan todo en PostgreSQL.
+
+### Cómo correrlo en local
+
+1. Base de datos (requiere Docker):
+   ```bash
+   docker compose up -d
+   ```
+2. Backend (Java 21):
+   ```bash
+   DB_USERNAME=fidegresa DB_PASSWORD=fidegresa_local JWT_SECRET=una-clave-larga-de-al-menos-32-caracteres mvn spring-boot:run
+   ```
+   La primera vez carga una cuenta de prueba: `maria@fidegresa.com` · `Fidegresa2026`.
+3. Pruebas automáticas (usan H2 en memoria, no necesitan PostgreSQL):
+   ```bash
+   mvn verify
+   ```
+
+### Variables de entorno
+
+| Variable | Para qué sirve | Valor local por defecto |
+|---|---|---|
+| `DB_URL` | Conexión JDBC a PostgreSQL | `jdbc:postgresql://localhost:5432/fidegresa_db` |
+| `DB_USERNAME` / `DB_PASSWORD` | Usuario y contraseña de la base | usuario del sistema / vacío |
+| `JWT_SECRET` | Clave para firmar los JWT (mínimo 32 caracteres) | clave temporal al iniciar |
+| `JWT_EXPIRATION_MINUTES` / `JWT_REFRESH_DAYS` | Duración del token y del refresh token | 30 / 14 |
+| `CORS_ALLOWED_ORIGINS` | Dominios que pueden llamar a la API (ej. la URL de Vercel) | localhost |
+| `SEED_DEMO` / `SEED_EMAIL` / `SEED_PASSWORD` | Cuenta de prueba que se crea si no existe | `true` / `maria@fidegresa.com` / `Fidegresa2026` |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | Correo de bienvenida y envío de prueba de audiencias (opcional) | vacío: no se envía |
+| `PORT` | Puerto HTTP | 8080 |
+
+Ninguna contraseña ni clave queda escrita en el código.
+
+### Módulos y endpoints (todos bajo `/api/v1`)
+
+| Módulo | Endpoints |
+|---|---|
+| Autenticación | `POST /auth/login`, `/auth/register`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` |
+| Locales | `GET/POST /branches`, `PUT /branches/{id}`, `PATCH /branches/{id}/status`, `PATCH /branches/{id}/position` |
+| Clientes | `GET /customers` (paginado, búsqueda, filtro, orden), `GET /customers/stats`, `GET /customers/{id}`, `POST /customers` |
+| Programas | `GET/POST /loyalty-programs`, `GET/PUT/DELETE /loyalty-programs/{id}`, `PATCH .../status`, `POST .../duplicate`, `GET .../customers` (paginado) |
+| Caja (app móvil) | `GET /cards/qr/{token}`, `POST /cards/{id}/stamps`, `/redemptions`, `/purchases`, `/balance-charges`, `PATCH /cards/{id}/status`, `GET /cards/{id}/transactions`, `GET /transactions`, `DELETE /transactions/{id}` |
+| Métricas | `GET /metrics`, `/metrics/overview`, `/metrics/activity`, `/metrics/cohorts`, `/metrics/insights`, `/metrics/export` |
+| Reseñas | `GET /reviews` (paginado), `GET /reviews/summary`, `PATCH /reviews/{id}/reply` |
+| Geolocalización | `GET /geo/customers`, `GET/PATCH /geo/settings`, `/audiences` (CRUD, vista previa, estado, prueba, duplicar) |
+| Equipo | `GET/POST /team`, `PUT/DELETE /team/{id}` |
+| Configuración | `GET/PATCH /settings`, `POST /settings/reset`, `GET /notices`, `POST /subscription/upgrade`, `DELETE /account` |
+
+Cada negocio solo ve sus propios datos: todas las consultas se filtran por el negocio del usuario autenticado.
+
+---
+
 ## Índice
 
 1. [Introducción](#1-introducción)

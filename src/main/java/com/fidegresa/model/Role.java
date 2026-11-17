@@ -1,3 +1,4 @@
 package com.fidegresa.model;
 
-public enum Role { ADMIN, BRAND_ADMIN, CASHIER }
+/** ADMIN: dueño del negocio. CASHIER: cajero que usa la app móvil. */
+public enum Role { ADMIN, CASHIER }

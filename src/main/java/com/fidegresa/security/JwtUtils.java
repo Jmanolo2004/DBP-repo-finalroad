@@ -4,59 +4,51 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
-import java.util.function.Function;
 
+/** Crea y lee los JWT. La clave viene de la variable de entorno JWT_SECRET. */
 @Component
 public class JwtUtils {
+    private final Key signingKey;
+    private final long expirationMillis;
 
-    @Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
-    private String secretKey;
-
-    @Value("${jwt.expiration:86400000}") // 1 día por defecto
-    private long jwtExpiration;
-
-    private Key getSignInKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes());
+    public JwtUtils(@Value("${app.jwt.secret}") String secret,
+                    @Value("${app.jwt.expiration-minutes:30}") long expirationMinutes) {
+        if (secret == null || secret.isBlank()) {
+            // Solo para desarrollo local: las sesiones se cierran al reiniciar el servidor.
+            LoggerFactory.getLogger(JwtUtils.class).warn("JWT_SECRET no está definido: se usa una clave temporal.");
+            this.signingKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        } else if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT_SECRET debe tener al menos 32 caracteres.");
+        } else {
+            this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        }
+        this.expirationMillis = expirationMinutes * 60_000;
     }
 
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(String email) {
+        long now = System.currentTimeMillis();
         return Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .setSubject(email)
+                .setIssuedAt(new Date(now))
+                .setExpiration(new Date(now + expirationMillis))
+                .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
-
-    private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder().setSigningKey(getSignInKey()).build().parseClaimsJws(token).getBody();
+    /** Devuelve el correo del token, o null si es inválido o expiró. */
+    public String validEmail(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token).getBody();
+            return claims.getSubject();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 }

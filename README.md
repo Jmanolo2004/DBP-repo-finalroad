@@ -1,17 +1,27 @@
 ## Fidegresa.GO — Backend
 > **CS 2031 · Desarrollo Basado en Plataforma**  
 > **Proyecto 1 · Semana 7 — Backend completo**  
-> **Equipo:** Manuel Aguirre · Geannyra Cortez · Jennifer Patiño · Jossue Caceres
+> **Equipo:** José Manuel Aguirre · Geannyra Cortez · Jennifer Patiño
 >
 > **Repositorio:** [https://github.com/Jmanolo2004/DBP-repo-finalroad](https://github.com/Jmanolo2004/DBP-repo-finalroad)  
-> **Deployment (AWS):** [http://52.201.102.208:8080/api/v1](http://52.201.102.208:8080/api/v1)  
-> **Swagger:** [http://52.201.102.208:8080/swagger-ui/index.html](http://52.201.102.208:8080/swagger-ui/index.html)
+> **API publicada (Render + Neon, HTTPS):** [https://fidegresa-api.onrender.com/api/v1](https://fidegresa-api.onrender.com/api/v1/health)  
+> **Web:** [https://frontendfidegresa.vercel.app](https://frontendfidegresa.vercel.app)  
 
 ---
 
 ## Proyecto 2 · Backend conectado a la web y a la app de caja
 
 Esta versión reemplaza los datos de demostración del frontend: la web y la app móvil leen y guardan todo en PostgreSQL.
+
+Está publicado en **Render** (backend) y **Neon** (PostgreSQL), con HTTPS. Los pasos están en [DEPLOY.md](DEPLOY.md).
+
+### Equipo y participación
+
+| Integrante | Principales aportes | Participación |
+|---|---|---|
+| **José Manuel Aguirre Jiménez** | Backend del Proyecto 1 (entidades, seguridad JWT, excepciones, eventos y correo), GitHub Actions y deployment del Proyecto 1 en AWS (EC2 + RDS). | 100 % |
+| **Geannyra Cortez** | Pantallas del frontend que consumen esta API: login, registro, métricas, tarjetas y geolocalización. | 100 % |
+| **Jennifer Patiño** | Backend con datos reales del Proyecto 2: locales, clientes, programas con reglas por tipo, caja (sellos, cashback, niveles y gift card), métricas, reseñas, equipo, geolocalización, aislamiento por negocio, variables de entorno, 31 pruebas automáticas y deployment del Proyecto 2 (Docker en Render, PostgreSQL en Neon, UptimeRobot). | 100 % |
 
 ### Cómo correrlo en local
 

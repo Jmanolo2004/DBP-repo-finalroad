@@ -16,11 +16,14 @@ import java.util.Map;
 public class MetricsController {
     private final MetricsService metricsService;
     private final MetricsOverviewService overviewService;
+    private final ProfitabilityService profitabilityService;
     private final CurrentUser currentUser;
 
-    public MetricsController(MetricsService metricsService, MetricsOverviewService overviewService, CurrentUser currentUser) {
+    public MetricsController(MetricsService metricsService, MetricsOverviewService overviewService,
+                             ProfitabilityService profitabilityService, CurrentUser currentUser) {
         this.metricsService = metricsService;
         this.overviewService = overviewService;
+        this.profitabilityService = profitabilityService;
         this.currentUser = currentUser;
     }
 
@@ -52,6 +55,12 @@ public class MetricsController {
     @GetMapping("/export")
     public Map<String, Object> export(@RequestParam Map<String, String> params) {
         return overviewService.export(currentUser.business(), query(params));
+    }
+
+    @GetMapping("/profitability")
+    public ProfitabilityResponse profitability(@RequestParam(required = false) String from, @RequestParam(required = false) String to,
+                                               @RequestParam(required = false) Long branchId) {
+        return profitabilityService.profitability(currentUser.businessId(), from, to, branchId);
     }
 
     private static MetricsOverviewService.Query query(Map<String, String> params) {

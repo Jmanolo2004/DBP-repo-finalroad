@@ -53,7 +53,7 @@ Ninguna contraseña ni clave queda escrita en el código.
 | Clientes | `GET /customers` (paginado, búsqueda, filtro, orden), `GET /customers/stats`, `GET /customers/{id}`, `POST /customers` |
 | Programas | `GET/POST /loyalty-programs`, `GET/PUT/DELETE /loyalty-programs/{id}`, `PATCH .../status`, `POST .../duplicate`, `GET .../customers` (paginado) |
 | Caja (app móvil) | `GET /cards/qr/{token}`, `POST /cards/{id}/stamps`, `/redemptions`, `/purchases`, `/balance-charges`, `PATCH /cards/{id}/status`, `GET /cards/{id}/transactions`, `GET /transactions`, `DELETE /transactions/{id}` |
-| Métricas | `GET /metrics`, `/metrics/overview`, `/metrics/activity`, `/metrics/cohorts`, `/metrics/insights`, `/metrics/export` |
+| Métricas | `GET /metrics`, `/metrics/overview`, `/metrics/activity`, `/metrics/cohorts`, `/metrics/insights`, `/metrics/export`, `/metrics/profitability` |
 | Reseñas | `GET /reviews` (paginado), `GET /reviews/summary`, `PATCH /reviews/{id}/reply` |
 | Geolocalización | `GET /geo/customers`, `GET/PATCH /geo/settings`, `/audiences` (CRUD, vista previa, estado, prueba, duplicar) |
 | Equipo | `GET/POST /team`, `PUT/DELETE /team/{id}` |

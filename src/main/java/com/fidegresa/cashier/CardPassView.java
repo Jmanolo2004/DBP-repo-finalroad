@@ -16,52 +16,55 @@ import java.util.List;
  */
 public record CardPassView(Long cardId, String qrToken, String serial, boolean usable, boolean expired, String businessName,
                            String programName, String programType, String primaryColor, String customerName,
-                           Field first, Field second, String details, Instant expiresAt) {
+                           Field first, Field second, String details, Instant expiresAt, String headline) {
 
     public record Field(String label, String value) {
     }
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    /**
+     * El encabezado del pase es el dato principal (sellos, saldo o nivel); la fila de dos datos lleva el avance
+     * como texto ("340 / 500 pts", "S/ 120.00 de S/ 150.00"). Usa el mismo CardDisplay que la web y la app.
+     */
     public static CardPassView of(LoyaltyCard card) {
         LoyaltyProgram program = card.getProgram();
-        ProgramRules rules = new ProgramRules(program);
-        String type = program.getType();
+        CardDisplay display = CardDisplay.of(card, null);
         Field first;
         Field second;
-        String details;
-        switch (type) {
-            case ProgramRules.STAMPS -> {
-                first = new Field("Sellos", card.getStamps() + " / " + rules.stampGoal());
-                second = new Field("Premio", rules.reward());
-                details = "Junta " + rules.stampGoal() + " sellos y canjea: " + rules.reward() + ".";
+        String headline = display.headline();
+        String details = display.progressText() + ".";
+        switch (display.type()) {
+            case "STAMPS" -> {
+                CardDisplay.Stamps stamps = display.stamps();
+                headline = display.headline() + " sellos";
+                first = new Field("Faltan", stamps.remaining() == 0 ? "¡Completa!" : stamps.remaining() + (stamps.remaining() == 1 ? " sello" : " sellos"));
+                second = new Field("Premio", stamps.reward());
+                details += " Junta " + stamps.goal() + " sellos y canjea tu premio.";
             }
-            case ProgramRules.CASHBACK -> {
-                first = new Field("Saldo", soles(card.getCashbackBalance()));
-                second = new Field("Cashback", percent(rules.cashbackPercent()) + " por compra");
-                details = "Cada compra te devuelve " + percent(rules.cashbackPercent()) + " como saldo para tu próxima visita.";
+            case "CASHBACK" -> {
+                CardDisplay.Cashback cashback = display.cashback();
+                first = new Field("Cashback", cashback.percentText() + " por compra");
+                second = new Field("Úsalo", cashback.minimumRedeem().signum() > 0 ? "Desde " + soles(cashback.minimumRedeem()) : "En tu próxima compra");
             }
-            case ProgramRules.LEVELS -> {
-                List<ProgramRules.Level> levels = rules.levels();
-                int number = rules.levelFor(card.getPoints());
-                ProgramRules.Level current = levels.stream().filter(level -> level.number() == number).findFirst().orElse(null);
-                ProgramRules.Level next = levels.stream().filter(level -> level.number() == number + 1).findFirst().orElse(null);
-                first = new Field("Nivel", current == null ? "Nivel " + number : current.name());
-                second = new Field("Puntos", String.valueOf(card.getPoints()));
-                details = next == null ? "Estás en el nivel más alto." : "Te faltan " + Math.max(0, next.minPoints() - card.getPoints())
-                        + " puntos para " + next.name() + ".";
-                if (current != null && current.benefit() != null && !current.benefit().isBlank()) details += " Tu beneficio: " + current.benefit() + ".";
+            case "LEVELS" -> {
+                CardDisplay.Levels levels = display.levels();
+                first = new Field("Puntos", levels.pointsText());
+                second = new Field("Siguiente", levels.next() == null ? "Nivel máximo" : levels.next().name());
+                String benefit = levels.current().benefit();
+                if (benefit != null && !benefit.isBlank()) details += " Tu beneficio: " + benefit + ".";
             }
             default -> {
-                first = new Field("Saldo", soles(card.getGiftBalance()));
+                CardDisplay.Gift gift = display.gift();
+                first = new Field("Saldo", gift.balanceText());
                 second = new Field("Vence", card.getExpiresAt() == null ? "Sin vencimiento" : DATE.format(card.getExpiresAt().atZone(CashierService.LIMA)));
-                details = "Gift card de " + soles(card.getGiftInitialAmount()) + ".";
+                if (gift.message() != null) details = gift.message() + ". " + details;
             }
         }
         boolean expired = card.getExpiresAt() != null && card.getExpiresAt().isBefore(Instant.now());
         return new CardPassView(card.getId(), card.getQrToken(), CashierMapper.serial(card.getQrToken()),
-                card.getStatus() == CardStatus.ACTIVE && !expired, expired, program.getBusiness().getName(), program.getName(), type,
-                program.getPrimaryColor(), card.getCustomer().getFullName(), first, second, details, card.getExpiresAt());
+                card.getStatus() == CardStatus.ACTIVE && !expired, expired, program.getBusiness().getName(), program.getName(), program.getType(),
+                display.colors().background(), card.getCustomer().getFullName(), first, second, details, card.getExpiresAt(), headline);
     }
 
     /**
@@ -94,7 +97,4 @@ public record CardPassView(Long cardId, String qrToken, String serial, boolean u
         return "S/ " + (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 
-    private static String percent(BigDecimal value) {
-        return (value == null ? BigDecimal.ZERO : value).stripTrailingZeros().toPlainString() + " %";
-    }
 }

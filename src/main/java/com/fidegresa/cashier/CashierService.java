@@ -259,6 +259,14 @@ public class CashierService {
                 mapper.toCard(card));
     }
 
+    /** El display de una tarjeta del negocio (lo mismo que trae la tarjeta al escanearla). */
+    @Transactional(readOnly = true)
+    public CardDisplay display(Long cardId) {
+        LoyaltyCard card = cards.findFullByIdAndBusinessId(cardId, currentUser.businessId())
+                .orElseThrow(() -> ApiException.notFound("Tarjeta no encontrada."));
+        return mapper.display(card);
+    }
+
     @Transactional
     public CardDto updateStatus(Long cardId, StatusRequest request) {
         String value = request == null || request.status() == null ? "" : request.status().trim().toUpperCase(Locale.ROOT);

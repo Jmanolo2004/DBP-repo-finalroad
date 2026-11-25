@@ -211,7 +211,7 @@ class ReferralTest {
     void elPaseLlevaElEnlaceParaInvitar() {
         WalletPassBuilder builder = new WalletPassBuilder(mapper);
         CardPassView view = new CardPassView(1L, "FDG-EST-AAAA", "EST-AAAA", true, false, "Polo", "Sellos", "Estampillas", "#d9a514",
-                "Ana", new CardPassView.Field("Sellos", "1 / 8"), new CardPassView.Field("Premio", "Helado"), "Junta 8 sellos.", null);
+                "Ana", new CardPassView.Field("Sellos", "1 / 8"), new CardPassView.Field("Premio", "Helado"), "Junta 8 sellos.", null, "1 / 8 sellos");
         JsonNode object = builder.genericObject("123", view, null, List.of(
                 new WalletPassBuilder.Module("invita", "Invita a un amigo y ganan los dos", null, "https://frontendfidegresa.vercel.app/r/ANA12"),
                 new WalletPassBuilder.Module("inseguro", "No", null, "http://ejemplo.com")));

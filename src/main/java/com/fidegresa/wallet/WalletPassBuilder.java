@@ -54,19 +54,32 @@ public class WalletPassBuilder {
     }
 
     public ObjectNode genericObject(String issuerId, CardPassView card, String logoUrl, List<Module> extra) {
+        return genericObject(issuerId, card, logoUrl, null, extra);
+    }
+
+    /**
+     * Encabezado = el dato principal (sellos, saldo o nivel) y, arriba, el nombre del cliente; heroUrl es la portada
+     * del programa (opcional, HTTPS pública).
+     */
+    public ObjectNode genericObject(String issuerId, CardPassView card, String logoUrl, String heroUrl, List<Module> extra) {
         ObjectNode object = mapper.createObjectNode()
                 .put("id", objectId(issuerId, card.qrToken()))
                 .put("classId", classId(issuerId))
                 .put("state", card.expired() ? "EXPIRED" : card.usable() ? "ACTIVE" : "INACTIVE");
         object.set("cardTitle", localized(text(card.businessName(), 60, "Fidegresa")));
-        object.set("subheader", localized(text(card.programName(), 60, card.programType())));
-        object.set("header", localized(text(card.customerName(), 40, "Cliente")));
+        object.set("subheader", localized(text(card.customerName(), 40, "Cliente")));
+        object.set("header", localized(text(card.headline(), 40, text(card.programName(), 40, card.programType()))));
         object.put("hexBackgroundColor", card.primaryColor() != null && HEX_COLOR.matcher(card.primaryColor()).matches()
                 ? card.primaryColor() : "#603f2a");
         if (publicImage(logoUrl)) {
             ObjectNode logo = object.putObject("logo");
             logo.putObject("sourceUri").put("uri", logoUrl);
             logo.set("contentDescription", localized("Logo de " + text(card.businessName(), 60, "Fidegresa")));
+        }
+        if (publicImage(heroUrl)) {
+            ObjectNode hero = object.putObject("heroImage");
+            hero.putObject("sourceUri").put("uri", heroUrl);
+            hero.set("contentDescription", localized("Portada de " + text(card.programName(), 60, "la tarjeta")));
         }
         object.putObject("barcode").put("type", "QR_CODE").put("value", card.qrToken().toUpperCase(Locale.ROOT))
                 .put("alternateText", card.serial());

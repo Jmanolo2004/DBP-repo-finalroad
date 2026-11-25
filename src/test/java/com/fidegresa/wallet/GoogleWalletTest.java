@@ -147,8 +147,12 @@ class GoogleWalletTest {
         assertThat(object.get("state").asText()).isEqualTo("ACTIVE");
         assertThat(object.at("/barcode/value").asText()).isEqualTo(card.getQrToken());
         assertThat(object.at("/cardTitle/defaultValue/value").asText()).isEqualTo("Fidegresa");
-        assertThat(object.at("/textModulesData/0/header").asText()).isEqualTo("Sellos");
-        assertThat(object.at("/textModulesData/0/body").asText()).isEqualTo(card.getStamps() + " / 10");
+        // Encabezado = el dato principal; arriba, el cliente; la fila dice cuánto falta y el premio.
+        assertThat(object.at("/header/defaultValue/value").asText()).isEqualTo(card.getStamps() + " / 10 sellos");
+        assertThat(object.at("/subheader/defaultValue/value").asText()).isEqualTo(inTx(c -> c.getCustomer().getFullName(), card.getId()));
+        assertThat(object.at("/textModulesData/0/header").asText()).isEqualTo("Faltan");
+        assertThat(object.at("/textModulesData/0/body").asText()).isEqualTo((10 - card.getStamps()) + " sellos");
+        assertThat(object.at("/textModulesData/1/header").asText()).isEqualTo("Premio");
         assertThat(object.at("/logo/sourceUri/uri").asText()).isEqualTo("https://frontendfidegresa.vercel.app/icon-512.png");
 
         // El enlace lleva solo el id del pase, firmado con la llave de la cuenta de servicio.
@@ -179,7 +183,7 @@ class GoogleWalletTest {
         read(post("/api/v1/cards/" + card.getId() + "/stamps").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"branchId\":" + branchId + ",\"quantity\":1}"), token);
         JsonNode patched = awaitPatch(objectId, 2);
-        assertThat(patched.at("/textModulesData/0/body").asText()).isEqualTo((before + 1) + " / 10");
+        assertThat(patched.at("/header/defaultValue/value").asText()).isEqualTo((before + 1) + " / 10 sellos");
 
         // Bloquear la tarjeta deja el pase inactivo.
         CALLS.clear();

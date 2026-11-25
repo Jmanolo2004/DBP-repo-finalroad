@@ -1,5 +1,7 @@
 package com.fidegresa.mail;
 
+import com.fidegresa.common.ColorContrast;
+
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -29,7 +31,8 @@ public final class EmailTemplates {
                 </title></head><body style="margin:0;padding:0;background:#f4f1ec;font-family:Arial,Helvetica,sans-serif;color:#2b2420">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ec"><tr><td align="center" style="padding:24px 12px">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden">
-                <tr><td style="background:""").append(color).append(";padding:20px 24px;color:#ffffff;font-size:20px;font-weight:bold\">");
+                <tr><td style="background:""").append(color).append(";padding:20px 24px;color:")
+                .append(ColorContrast.textOn(color, ColorContrast.LIGHT).color()).append(";font-size:20px;font-weight:bold\">");
         if (c.logoUrl() != null && c.logoUrl().startsWith("https://")) {
             html.append("<img src=\"").append(escape(c.logoUrl())).append("\" alt=\"\" width=\"36\" height=\"36\" style=\"vertical-align:middle;border-radius:8px;margin-right:10px\">");
         }
@@ -46,7 +49,7 @@ public final class EmailTemplates {
         if (c.buttons() != null) {
             for (Button button : c.buttons()) {
                 html.append("<p style=\"margin:8px 0 14px\"><a href=\"").append(escape(button.url())).append("\" style=\"display:inline-block;background:")
-                        .append(color).append(";color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:999px\">")
+                        .append(color).append(";color:").append(ColorContrast.textOn(color, ColorContrast.LIGHT).color()).append(";text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:999px\">")
                         .append(escape(button.label())).append("</a></p>");
             }
         }

@@ -46,11 +46,12 @@ public class CustomerMailer {
     private final String webUrl;
     private final String apiUrl;
     private final String logoUrl;
+    private final com.fidegresa.program.ProgramImages images;
     private final SecureRandom random = new SecureRandom();
 
     public CustomerMailer(MailGateway gateway, EmailSendRepository sends, EntityManager em, PlatformTransactionManager transactions,
                           @Value("${app.public.web-url:}") String webUrl, @Value("${app.public.api-url:}") String apiUrl,
-                          @Value("${app.mail.logo-url:}") String logoUrl) {
+                          @Value("${app.mail.logo-url:}") String logoUrl, com.fidegresa.program.ProgramImages images) {
         this.gateway = gateway;
         this.sends = sends;
         this.em = em;
@@ -58,6 +59,7 @@ public class CustomerMailer {
         this.webUrl = trimUrl(webUrl);
         this.apiUrl = trimUrl(apiUrl);
         this.logoUrl = logoUrl == null ? "" : logoUrl.trim();
+        this.images = images;
     }
 
     /** SENT, LOGGED o FAILED si se intentó; SKIPPED si no corresponde (sin consentimiento, dado de baja o ya enviado). */
@@ -113,10 +115,19 @@ public class CustomerMailer {
         String unsubscribe = webUrl.isEmpty() ? apiUrl.isEmpty() ? null : apiUrl + "/api/v1/public/unsubscribe/" + customer.getEmailToken()
                 : webUrl + "/baja/" + customer.getEmailToken();
         String header = apiUrl.isEmpty() ? null : apiUrl + "/api/v1/public/unsubscribe/" + customer.getEmailToken();
-        Content content = new Content(business.getName(), business.getPrimaryColor(), logoUrl,
+        Content content = new Content(business.getName(), business.getPrimaryColor(), logoFor(business.getId()),
                 EmailTemplates.fill(message.title(), name, business.getName()), EmailTemplates.fill(message.body(), name, business.getName()),
                 EmailTemplates.fill(message.benefit(), name, business.getName()), message.buttons(), message.footnote(), unsubscribe);
         return new Prepared(customer.getEmail(), EmailTemplates.fill(message.subject(), name, business.getName()), content, business.getId(), header);
+    }
+
+    /** Logo del primer programa activo del negocio que tenga uno; si no, el logo general (MAIL_LOGO_URL). */
+    private String logoFor(Long businessId) {
+        List<com.fidegresa.model.LoyaltyProgram> programs = em.createQuery("select p from LoyaltyProgram p where p.business.id = :b"
+                        + " and p.status = 'Activa' and p.logo is not null order by p.id", com.fidegresa.model.LoyaltyProgram.class)
+                .setParameter("b", businessId).setMaxResults(1).getResultList();
+        String url = programs.isEmpty() ? null : images.url(programs.get(0), "logo");
+        return url != null ? url : logoUrl;
     }
 
     /** Dirección de la API pública (para enlaces que abre el cliente desde el correo, como Google Wallet). */

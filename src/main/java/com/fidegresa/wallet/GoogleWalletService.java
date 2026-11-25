@@ -45,11 +45,13 @@ public class GoogleWalletService {
     private final String logoUrl;
     private final String webUrl;
     private final long retryDelayMs;
+    private final com.fidegresa.program.ProgramImages images;
 
     public GoogleWalletService(GoogleWalletClient client, LoyaltyCardRepository cards, List<WalletModuleSource> moduleSources,
                                ObjectMapper mapper, PlatformTransactionManager transactions,
                                @Value("${app.wallet.logo-url:}") String logoUrl, @Value("${app.public.web-url:}") String webUrl,
-                               @Value("${app.wallet.retry-delay-ms:2000}") long retryDelayMs) {
+                               @Value("${app.wallet.retry-delay-ms:2000}") long retryDelayMs,
+                               com.fidegresa.program.ProgramImages images) {
         this.client = client;
         this.cards = cards;
         this.moduleSources = moduleSources;
@@ -60,6 +62,7 @@ public class GoogleWalletService {
         this.logoUrl = logoUrl == null ? "" : logoUrl.trim();
         this.webUrl = webUrl == null ? "" : webUrl.trim().replaceAll("/+$", "");
         this.retryDelayMs = retryDelayMs;
+        this.images = images;
     }
 
     public boolean configured() {
@@ -155,6 +158,9 @@ public class GoogleWalletService {
     private Prepared prepare(LoyaltyCard card) {
         List<WalletPassBuilder.Module> extra = new ArrayList<>();
         for (WalletModuleSource source : moduleSources) extra.addAll(source.modulesFor(card));
-        return new Prepared(card.getId(), builder.genericObject(client.issuerId(), CardPassView.of(card), logoUrl, extra));
+        // Logo y portada del programa (si tiene y hay PUBLIC_API_URL); si no, el logo general de GOOGLE_WALLET_LOGO_URL.
+        String programLogo = images.url(card.getProgram(), "logo");
+        return new Prepared(card.getId(), builder.genericObject(client.issuerId(), CardPassView.of(card), programLogo != null ? programLogo : logoUrl,
+                images.url(card.getProgram(), "cover"), extra));
     }
 }

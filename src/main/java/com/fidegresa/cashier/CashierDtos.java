@@ -52,7 +52,7 @@ public final class CashierDtos {
     public record CardDto(Long id, String qrToken, String serialNumber, String status, String programType, ProgramDto program,
                           CustomerDto customer, int stampBalance, BigDecimal cashbackBalance, int points, int level,
                           BigDecimal giftBalance, BigDecimal giftInitialAmount, Instant expiresAt,
-                          List<PromotionDtos.CardPromotion> promotions) {
+                          List<PromotionDtos.CardPromotion> promotions, CardDisplay display) {
     }
 
     public record TransactionDto(Long id, String type, BigDecimal amount, String unit, BigDecimal purchaseAmount, Instant createdAt,

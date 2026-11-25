@@ -118,7 +118,9 @@ public class CustomerMailer {
         Content content = new Content(business.getName(), business.getPrimaryColor(), logoFor(business.getId()),
                 EmailTemplates.fill(message.title(), name, business.getName()), EmailTemplates.fill(message.body(), name, business.getName()),
                 EmailTemplates.fill(message.benefit(), name, business.getName()), message.buttons(), message.footnote(), unsubscribe);
-        return new Prepared(customer.getEmail(), EmailTemplates.fill(message.subject(), name, business.getName()), content, business.getId(), header);
+        // Sin saltos de línea en el asunto: nunca se pueden colar cabeceras de correo.
+        String subject = EmailTemplates.fill(message.subject(), name, business.getName()).replaceAll("[\\r\\n]+", " ").trim();
+        return new Prepared(customer.getEmail(), subject, content, business.getId(), header);
     }
 
     /** Logo del primer programa activo del negocio que tenga uno; si no, el logo general (MAIL_LOGO_URL). */

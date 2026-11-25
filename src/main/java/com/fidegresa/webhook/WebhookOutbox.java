@@ -85,13 +85,14 @@ class WebhookOutbox {
         return Optional.of(delivery);
     }
 
-    /** Evento de un movimiento; null si no se avisa (consultas, visitas sin tarjeta y uso de cashback). */
+    /** Evento de un movimiento (DISCOUNT: discount.created); null si no se avisa (consultas, visitas sin tarjeta y uso de cashback). */
     private static String createdEvent(CardTransaction tx) {
         LoyaltyProgram program = MovementLabels.programOf(tx);
         return switch (tx.getType()) {
             case REDEMPTION -> "redemption.created";
             case PURCHASE, STAMP -> "purchase.created";
             case BALANCE_CHARGE -> program != null && "Giftcard".equals(program.getType()) ? "purchase.created" : null;
+            case DISCOUNT -> "discount.created";
             case VISIT, CONSULT -> null;
         };
     }
@@ -111,6 +112,10 @@ class WebhookOutbox {
         data.put("quantity", MovementLabels.quantity(tx));
         data.put("unit", tx.getUnit());
         data.put("amount", amount.signum() == 0 ? null : amount);
+        if (tx.getType() == TransactionType.DISCOUNT) {
+            data.put("promotion", reference(tx.getPromotionId(), tx.getPromotionName()));
+            data.put("discount", MovementLabels.money(tx.getUnits()));
+        }
         data.put("currency", "PEN");
         return data;
     }

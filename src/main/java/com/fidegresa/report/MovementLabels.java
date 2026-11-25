@@ -26,6 +26,7 @@ public final class MovementLabels {
             case BALANCE_CHARGE -> "Cashback".equals(programType) ? "Uso de cashback"
                     : "Giftcard".equals(programType) ? "Pago con gift card" : "Uso de saldo";
             case CONSULT -> "Consulta";
+            case DISCOUNT -> "Descuento de promoción";
         };
     }
 

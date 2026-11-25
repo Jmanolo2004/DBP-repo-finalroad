@@ -27,4 +27,6 @@ public interface LoyaltyCardRepository extends JpaRepository<LoyaltyCard, Long> 
     Optional<LoyaltyCard> findByCustomerIdAndProgramId(Long customerId, Long programId);
 
     boolean existsByQrToken(String qrToken);
+
+    Optional<LoyaltyCard> findByQrTokenIgnoreCase(String qrToken);
 }

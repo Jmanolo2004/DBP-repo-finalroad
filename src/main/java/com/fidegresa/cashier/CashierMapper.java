@@ -5,6 +5,7 @@ import com.fidegresa.model.CardTransaction;
 import com.fidegresa.model.LoyaltyCard;
 import com.fidegresa.model.LoyaltyProgram;
 import com.fidegresa.model.TransactionType;
+import com.fidegresa.promotion.PromotionService;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -14,6 +15,11 @@ import java.util.List;
 /** Convierte tarjetas y movimientos al JSON que espera la app de caja. */
 @Component
 class CashierMapper {
+    private final PromotionService promotions;
+
+    CashierMapper(PromotionService promotions) {
+        this.promotions = promotions;
+    }
 
     CardDto toCard(LoyaltyCard card) {
         LoyaltyProgram program = card.getProgram();
@@ -24,7 +30,8 @@ class CashierMapper {
                 toProgram(program, rules, type),
                 new CustomerDto(card.getCustomer().getId(), card.getCustomer().getFullName(), card.getCustomer().getEmail()),
                 card.getStamps(), money(card.getCashbackBalance()), card.getPoints(), level,
-                money(card.getGiftBalance()), money(card.getGiftInitialAmount()), card.getExpiresAt());
+                money(card.getGiftBalance()), money(card.getGiftInitialAmount()), card.getExpiresAt(),
+                promotions.liveFor(card.getCustomer().getId(), program.getId()));
     }
 
     private ProgramDto toProgram(LoyaltyProgram program, ProgramRules rules, String type) {

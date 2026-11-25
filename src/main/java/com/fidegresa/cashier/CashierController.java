@@ -45,6 +45,13 @@ public class CashierController {
         return service.chargeBalance(id, body, key);
     }
 
+    /** Aplica en caja una promoción vigente del cliente. */
+    @PostMapping("/cards/{id}/discounts")
+    public DiscountDto discounts(@PathVariable Long id, @RequestBody(required = false) DiscountRequest body,
+                                 @RequestHeader(value = IDEMPOTENCY, required = false) String key) {
+        return service.discount(id, body, key);
+    }
+
     @PatchMapping("/cards/{id}/status")
     public CardDto status(@PathVariable Long id, @RequestBody(required = false) StatusRequest body) {
         return service.updateStatus(id, body);

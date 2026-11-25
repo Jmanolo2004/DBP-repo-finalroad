@@ -67,6 +67,10 @@ public class AccountController {
                 "delete from RefreshToken t where t.user.id in (select u.id from AppUser u where u.business.id = :id)",
                 "delete from AppUser u where u.business.id = :id",
                 "delete from Branch b where b.business.id = :id"};
+        // Promociones: sus destinatarios apuntan a clientes y la promoción a un programa.
+        for (String entity : new String[]{"WalletMessage", "PromotionRecipient", "Promotion"}) {
+            entityManager.createQuery("delete from " + entity + " x where x.business.id = :id").setParameter("id", businessId).executeUpdate();
+        }
         entityManager.createQuery("delete from MenuDailyStat s where s.business.id = :id").setParameter("id", businessId).executeUpdate();
         // La invitación apunta a un programa y a una imagen: se borra antes que ellos.
         entityManager.createQuery("delete from BranchInvitation i where i.business.id = :id").setParameter("id", businessId).executeUpdate();

@@ -33,7 +33,8 @@ public class PublicRateLimiter {
     public enum Limit {
         JOIN(5, Duration.ofMinutes(10)),
         MENU(60, Duration.ofMinutes(1)),
-        FILE(120, Duration.ofMinutes(1));
+        FILE(120, Duration.ofMinutes(1)),
+        WALLET(10, Duration.ofMinutes(10));
 
         final int max;
         final Duration window;

@@ -151,7 +151,7 @@ public class ReportService {
         } catch (IllegalArgumentException ignored) {
             // se informa abajo con un mensaje claro
         }
-        throw ApiException.badRequest("El tipo debe ser VISIT, STAMP, REDEMPTION, PURCHASE o BALANCE_CHARGE.");
+        throw ApiException.badRequest("El tipo debe ser VISIT, STAMP, REDEMPTION, PURCHASE, BALANCE_CHARGE o DISCOUNT.");
     }
 
     private static TransactionRow toRow(CardTransaction tx) {

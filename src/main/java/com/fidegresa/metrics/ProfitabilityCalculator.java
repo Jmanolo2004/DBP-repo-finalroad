@@ -120,7 +120,8 @@ final class ProfitabilityCalculator {
         return switch (movement.type()) {
             case VISIT, STAMP, PURCHASE -> true;
             case BALANCE_CHARGE -> hasType(movement, GIFT);
-            case REDEMPTION, CONSULT -> false;
+            // El descuento acompaña una compra que ya se registra con su sello o compra: no se cuenta dos veces.
+            case REDEMPTION, CONSULT, DISCOUNT -> false;
         };
     }
 
@@ -136,6 +137,8 @@ final class ProfitabilityCalculator {
             Program program = programOf(movement);
             return program == null || program.rewardCost() == null ? BigDecimal.ZERO : program.rewardCost();
         }
+        // El descuento de una promoción es un costo (en DISCOUNT, amount es el descuento).
+        if (movement.type() == TransactionType.DISCOUNT) return amountOf(movement);
         // El cashback usado es un costo, no una venta.
         if (movement.type() == TransactionType.BALANCE_CHARGE && hasType(movement, CASHBACK)) return amountOf(movement);
         return BigDecimal.ZERO;

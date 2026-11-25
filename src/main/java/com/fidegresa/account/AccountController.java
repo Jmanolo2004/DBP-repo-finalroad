@@ -67,6 +67,8 @@ public class AccountController {
                 "delete from RefreshToken t where t.user.id in (select u.id from AppUser u where u.business.id = :id)",
                 "delete from AppUser u where u.business.id = :id",
                 "delete from Branch b where b.business.id = :id"};
+        // La invitación apunta a un programa y a una imagen: se borra antes que ellos.
+        entityManager.createQuery("delete from BranchInvitation i where i.business.id = :id").setParameter("id", businessId).executeUpdate();
         // Los catálogos apuntan a los archivos: se borran antes que ellos.
         entityManager.createQuery("delete from CatalogFile f where f.catalog.id in (select c.id from BranchCatalog c where c.business.id = :id)")
                 .setParameter("id", businessId).executeUpdate();

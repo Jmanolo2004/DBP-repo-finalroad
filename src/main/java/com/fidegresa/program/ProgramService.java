@@ -34,12 +34,13 @@ public class ProgramService {
     private final CardTransactionRepository transactions;
     private final BusinessDataLoader loader;
     private final CardIssuer cardIssuer;
+    private final BranchInvitationRepository invitations;
     private static final BigDecimal MAX_MONEY = new BigDecimal("99999.99");
 
 
     public ProgramService(LoyaltyProgramRepository programs, BranchRepository branches, CustomerRepository customers,
                           LoyaltyCardRepository cards, CardTransactionRepository transactions, BusinessDataLoader loader,
-                          CardIssuer cardIssuer) {
+                          CardIssuer cardIssuer, BranchInvitationRepository invitations) {
         this.programs = programs;
         this.branches = branches;
         this.customers = customers;
@@ -47,6 +48,7 @@ public class ProgramService {
         this.transactions = transactions;
         this.loader = loader;
         this.cardIssuer = cardIssuer;
+        this.invitations = invitations;
     }
 
     @Transactional(readOnly = true)
@@ -157,6 +159,7 @@ public class ProgramService {
         transactions.findByCardProgramId(id).forEach(tx -> tx.setCard(null));
         transactions.flush();
         cards.deleteAll(programCards);
+        invitations.clearProgram(id); // la invitación del local queda sin programa (incompleta)
         programs.delete(program);
     }
 

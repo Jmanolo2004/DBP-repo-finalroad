@@ -20,5 +20,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     Optional<Customer> findByEmailToken(String emailToken);
 
+    Optional<Customer> findByReferralCode(String referralCode);
+
+    boolean existsByReferralCode(String referralCode);
+
     long countByBranchId(Long branchId);
 }

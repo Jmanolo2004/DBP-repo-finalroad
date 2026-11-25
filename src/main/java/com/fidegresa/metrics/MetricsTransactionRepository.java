@@ -17,10 +17,13 @@ interface MetricsTransactionRepository extends Repository<CardTransaction, Long>
 
     /**
      * Cliente, local, programa (null si no hay tarjeta), tipo e importe de los movimientos vigentes en [from, to).
-     * En DISCOUNT el importe es el descuento (un costo), no la compra.
+     * En DISCOUNT el importe es el descuento (un costo), no la compra; en REFERRAL_BONUS, los soles de cashback regalados
+     * (0 si el premio fue en sellos o puntos).
      */
     @Query("select t.customer.id, t.branch.id, c.program.id, t.type,"
-            + " case when t.type = com.fidegresa.model.TransactionType.DISCOUNT then t.units else t.purchaseAmount end"
+            + " case when t.type = com.fidegresa.model.TransactionType.DISCOUNT then t.units"
+            + " when t.type = com.fidegresa.model.TransactionType.REFERRAL_BONUS then (case when t.unit = 'SOLES' then t.units else 0 end)"
+            + " else t.purchaseAmount end"
             + " from CardTransaction t left join t.card c "
             + "where t.business.id = :businessId and t.voided = false and t.createdAt >= :from and t.createdAt < :to")
     List<Object[]> findMovements(@Param("businessId") Long businessId, @Param("from") Instant from, @Param("to") Instant to);

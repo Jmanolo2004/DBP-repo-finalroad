@@ -8,6 +8,8 @@ import com.fidegresa.data.BusinessDataLoader;
 import com.fidegresa.data.Views;
 import com.fidegresa.model.*;
 import com.fidegresa.promotion.PromotionService;
+import com.fidegresa.referral.BusinessReferralService;
+import com.fidegresa.referral.ReferralService;
 import com.fidegresa.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,13 +39,16 @@ public class ProgramService {
     private final CardIssuer cardIssuer;
     private final BranchInvitationRepository invitations;
     private final PromotionService promotions;
+    private final ReferralService referrals;
+    private final BusinessReferralService businessReferrals;
     private static final BigDecimal MAX_MONEY = new BigDecimal("99999.99");
 
 
     public ProgramService(LoyaltyProgramRepository programs, BranchRepository branches, CustomerRepository customers,
                           LoyaltyCardRepository cards, CardTransactionRepository transactions, BusinessDataLoader loader,
                           CardIssuer cardIssuer, BranchInvitationRepository invitations,
-                          PromotionService promotions) {
+                          PromotionService promotions, @org.springframework.context.annotation.Lazy ReferralService referrals,
+                          BusinessReferralService businessReferrals) {
         this.programs = programs;
         this.branches = branches;
         this.customers = customers;
@@ -53,6 +58,8 @@ public class ProgramService {
         this.cardIssuer = cardIssuer;
         this.invitations = invitations;
         this.promotions = promotions;
+        this.referrals = referrals;
+        this.businessReferrals = businessReferrals;
     }
 
     @Transactional(readOnly = true)
@@ -110,6 +117,7 @@ public class ProgramService {
         apply(program, business, body, true);
         programs.save(program);
         issueIfActive(program);
+        businessReferrals.programCreated(business.getId()); // si llegó recomendado, ya es "convertido"
         return detail(business, program.getId());
     }
 
@@ -163,6 +171,7 @@ public class ProgramService {
         transactions.findByCardProgramId(id).forEach(tx -> tx.setCard(null));
         transactions.flush();
         promotions.deleteForProgram(id); // sus promociones solo llegaban a tarjetas de este programa
+        referrals.deleteForProgram(id);
         cards.deleteAll(programCards);
         invitations.clearProgram(id); // la invitación del local queda sin programa (incompleta)
         programs.delete(program);

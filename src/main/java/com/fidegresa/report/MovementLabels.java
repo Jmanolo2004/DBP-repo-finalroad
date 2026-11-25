@@ -27,6 +27,7 @@ public final class MovementLabels {
                     : "Giftcard".equals(programType) ? "Pago con gift card" : "Uso de saldo";
             case CONSULT -> "Consulta";
             case DISCOUNT -> "Descuento de promoción";
+            case REFERRAL_BONUS -> "Premio por referido";
         };
     }
 

@@ -70,9 +70,11 @@ public class AccountController {
         // Promociones: sus destinatarios apuntan a clientes y la promoción a un programa.
         // Encuestas y resúmenes: apuntan a reseñas, clientes y locales.
         for (String entity : new String[]{"WalletMessage", "PromotionRecipient", "Promotion", "SurveyInvitation", "SurveySettings", "ReviewSummary",
-                "EmailSend", "EmailCampaign", "EmailAutomation", "SegmentSettings"}) {
+                "EmailSend", "EmailCampaign", "EmailAutomation", "SegmentSettings", "Referral", "ReferralSettings", "ReferralLinkStat"}) {
             entityManager.createQuery("delete from " + entity + " x where x.business.id = :id").setParameter("id", businessId).executeUpdate();
         }
+        entityManager.createQuery("delete from BusinessReferral r where r.referrer.id = :id or r.referred.id = :id")
+                .setParameter("id", businessId).executeUpdate();
         entityManager.createQuery("delete from MenuDailyStat s where s.business.id = :id").setParameter("id", businessId).executeUpdate();
         // La invitación apunta a un programa y a una imagen: se borra antes que ellos.
         entityManager.createQuery("delete from BranchInvitation i where i.business.id = :id").setParameter("id", businessId).executeUpdate();

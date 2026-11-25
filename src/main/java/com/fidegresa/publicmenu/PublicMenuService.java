@@ -64,13 +64,17 @@ public class PublicMenuService {
     private final String webUrl;
 
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final com.fidegresa.referral.ReferralService referrals;
+    private final com.fidegresa.referral.ReferralCodes referralCodes;
 
     public PublicMenuService(BranchRepository branches, BranchCatalogRepository catalogs, CatalogFileRepository catalogFiles,
                              BranchInvitationRepository invitations, InvitationService invitationService, LoyaltyProgramRepository programs,
                              CustomerRepository customers, LoyaltyCardRepository cards, CardIssuer cardIssuer, StoredFileService storedFiles,
                              PublicSlugs slugs, @Value("${app.public.consent-version:2026-11}") String consentVersion,
                              @Value("${app.public.web-url:}") String webUrl,
-                             org.springframework.context.ApplicationEventPublisher events) {
+                             org.springframework.context.ApplicationEventPublisher events,
+                             @org.springframework.context.annotation.Lazy com.fidegresa.referral.ReferralService referrals,
+                             com.fidegresa.referral.ReferralCodes referralCodes) {
         this.branches = branches;
         this.catalogs = catalogs;
         this.catalogFiles = catalogFiles;
@@ -84,6 +88,8 @@ public class PublicMenuService {
         this.slugs = slugs;
         this.consentVersion = consentVersion;
         this.events = events;
+        this.referrals = referrals;
+        this.referralCodes = referralCodes;
         this.webUrl = webUrl == null ? "" : webUrl.trim().replaceAll("/+$", "");
     }
 
@@ -174,7 +180,8 @@ public class PublicMenuService {
             }
             LoyaltyCard card = cards.findByCustomerIdAndProgramId(customer.getId(), program.getId())
                     .orElseGet(() -> cards.save(cardIssuer.newCard(customer, program)));
-            return new JoinResult(branch, new JoinResponse(true, customer.getFullName(), cardInfo(card, program)), false);
+            return new JoinResult(branch, new JoinResponse(true, customer.getFullName(), cardInfo(card, program),
+                    referrals.link(referralCodes.ensure(customer))), false);
         }
 
         Customer customer = new Customer();
@@ -194,8 +201,10 @@ public class PublicMenuService {
         customer.setSignupSource("MENU_QR");
         customers.save(customer);
         LoyaltyCard card = cards.save(cardIssuer.newCard(customer, program));
+        String code = referralCodes.ensure(customer);
+        if (request.referralCode() != null && !request.referralCode().isBlank()) referrals.register(request.referralCode(), customer, program);
         events.publishEvent(new CustomerJoinedEvent(customer.getId(), card.getId())); // correo de bienvenida, tras el commit
-        return new JoinResult(branch, new JoinResponse(false, fullName, cardInfo(card, program)), true);
+        return new JoinResult(branch, new JoinResponse(false, fullName, cardInfo(card, program), referrals.link(code)), true);
     }
 
     /** Enlace del menú público del local (para imprimir su QR). Asigna el slug si todavía no tiene. */

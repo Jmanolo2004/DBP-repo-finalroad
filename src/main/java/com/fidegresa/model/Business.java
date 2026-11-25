@@ -51,4 +51,8 @@ public class Business {
 
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
+
+    /** Código para recomendar Fidegresa a otros negocios (enlace /unete/{código}); se crea con su primer uso. */
+    @Column(name = "referral_code", length = 20, unique = true)
+    private String referralCode;
 }

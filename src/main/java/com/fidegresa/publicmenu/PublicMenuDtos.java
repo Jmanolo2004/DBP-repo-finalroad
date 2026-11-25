@@ -38,10 +38,13 @@ public final class PublicMenuDtos {
     }
 
     /** birthday opcional en formato dd/MM. consent debe ser true. */
-    public record JoinRequest(String fullName, String email, String phone, String birthday, Boolean consent, Long programId) {
+    /** referralCode: opcional, el código del amigo que lo invitó (enlace /r/:code). */
+    public record JoinRequest(String fullName, String email, String phone, String birthday, Boolean consent, Long programId,
+                              String referralCode) {
     }
 
-    public record JoinResponse(boolean alreadyRegistered, String customerName, CardInfo card) {
+    /** inviteLink: su enlace para invitar amigos (null si falta PUBLIC_WEB_URL). */
+    public record JoinResponse(boolean alreadyRegistered, String customerName, CardInfo card, String inviteLink) {
     }
 
     public record CardInfo(String qrToken, Long programId, String programName, String programType, String primaryColor, String accentColor,

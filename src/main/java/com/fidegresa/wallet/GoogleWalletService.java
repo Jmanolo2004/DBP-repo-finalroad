@@ -82,7 +82,8 @@ public class GoogleWalletService {
         if (!client.configured()) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "Google Wallet todavía no está configurado en el servidor.");
         }
-        Prepared prepared = readOnly.execute(status -> finder.get().map(this::prepare)
+        // En una transacción de escritura: al emitir el pase se puede crear el código para invitar amigos.
+        Prepared prepared = write.execute(status -> finder.get().map(this::prepare)
                 .orElseThrow(() -> ApiException.notFound("Tarjeta no encontrada.")));
         String objectId = prepared.object().get("id").asText();
         try {

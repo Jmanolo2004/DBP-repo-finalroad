@@ -18,8 +18,14 @@ public class WalletPassBuilder {
     static final String CLASS_SUFFIX = "fidegresa_tarjeta_v1";
     private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9a-fA-F]{6}$");
 
-    /** Texto extra del reverso del pase (por ejemplo, una promoción activa). */
-    public record Module(String id, String header, String body) {
+    /**
+     * Texto extra del reverso del pase (por ejemplo, una promoción activa). Con uri es un enlace (por ejemplo,
+     * "Invita a un amigo"): va en los enlaces del pase con header como texto.
+     */
+    public record Module(String id, String header, String body, String uri) {
+        public Module(String id, String header, String body) {
+            this(id, header, body, null);
+        }
     }
 
     private final ObjectMapper mapper;
@@ -71,7 +77,12 @@ public class WalletPassBuilder {
         modules.add(module("dato1", card.first().label(), card.first().value()));
         modules.add(module("dato2", card.second().label(), card.second().value()));
         if (card.details() != null && !card.details().isBlank()) modules.add(module("reglas", "Cómo funciona", card.details()));
-        if (extra != null) extra.forEach(m -> modules.add(module(m.id(), m.header(), m.body())));
+        if (extra != null) extra.stream().filter(m -> m.uri() == null).forEach(m -> modules.add(module(m.id(), m.header(), m.body())));
+        List<Module> links = extra == null ? List.of() : extra.stream().filter(m -> m.uri() != null && m.uri().startsWith("https://")).toList();
+        if (!links.isEmpty()) {
+            ArrayNode uris = object.putObject("linksModuleData").putArray("uris");
+            links.forEach(link -> uris.addObject().put("id", link.id()).put("uri", link.uri()).put("description", text(link.header(), 60, "Enlace")));
+        }
         return object;
     }
 

@@ -121,7 +121,7 @@ final class ProfitabilityCalculator {
             case VISIT, STAMP, PURCHASE -> true;
             case BALANCE_CHARGE -> hasType(movement, GIFT);
             // El descuento acompaña una compra que ya se registra con su sello o compra: no se cuenta dos veces.
-            case REDEMPTION, CONSULT, DISCOUNT -> false;
+            case REDEMPTION, CONSULT, DISCOUNT, REFERRAL_BONUS -> false;
         };
     }
 
@@ -139,6 +139,8 @@ final class ProfitabilityCalculator {
         }
         // El descuento de una promoción es un costo (en DISCOUNT, amount es el descuento).
         if (movement.type() == TransactionType.DISCOUNT) return amountOf(movement);
+        // El premio por referido en cashback es un costo (amount = los soles); en sellos se cuenta al canjear y en puntos no tiene costo.
+        if (movement.type() == TransactionType.REFERRAL_BONUS) return amountOf(movement);
         // El cashback usado es un costo, no una venta.
         if (movement.type() == TransactionType.BALANCE_CHARGE && hasType(movement, CASHBACK)) return amountOf(movement);
         return BigDecimal.ZERO;

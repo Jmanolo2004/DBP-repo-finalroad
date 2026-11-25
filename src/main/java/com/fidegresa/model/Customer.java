@@ -73,6 +73,10 @@ public class Customer {
     @Column(name = "email_token", length = 43, unique = true)
     private String emailToken;
 
+    /** Código para invitar amigos (ej. LUCIA23), único en toda la plataforma; se crea al unirse o con su primer uso. */
+    @Column(name = "referral_code", length = 20, unique = true)
+    private String referralCode;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;

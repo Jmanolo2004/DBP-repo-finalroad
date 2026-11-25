@@ -152,6 +152,8 @@ public class EmailAutomationService {
             if (wallet.configured() && !mailer.apiUrl().isEmpty()) {
                 buttons.add(new Button("Agregar a Google Wallet", mailer.apiUrl() + "/api/v1/public/cards/" + card.getQrToken() + "/google-wallet/save"));
             }
+            String code = card.getCustomer().getReferralCode();
+            if (code != null && !mailer.webUrl().isEmpty()) buttons.add(new Button("Invita a un amigo", mailer.webUrl() + "/r/" + code));
             return new Message("WELCOME", "welcome", automation.getSubject(), automation.getSubject(), automation.getBody(),
                     automation.getBenefit(), buttons, "Tu tarjeta: " + view.programName() + " · código " + view.serial() + ". " + view.details(), null);
         });

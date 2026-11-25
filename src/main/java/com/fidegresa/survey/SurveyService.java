@@ -113,7 +113,7 @@ public class SurveyService {
     public Optional<Invite> inviteAfter(Long transactionId) {
         if (!canInvite()) return Optional.empty();
         CardTransaction tx = em.find(CardTransaction.class, transactionId);
-        if (tx == null || tx.isVoided() || tx.getCard() == null) return Optional.empty();
+        if (tx == null || tx.isVoided() || tx.getCard() == null || tx.getType() == TransactionType.REFERRAL_BONUS) return Optional.empty();
         String channel = wallet.configured() && tx.getCard().getWalletObjectId() != null ? "WALLET"
                 : CustomerMailer.emailable(tx.getCustomer()) ? "EMAIL" : null;
         if (channel == null) return Optional.empty();

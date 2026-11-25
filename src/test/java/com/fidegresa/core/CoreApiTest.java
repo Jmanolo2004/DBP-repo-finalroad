@@ -155,6 +155,30 @@ class CoreApiTest {
     }
 
     @Test
+    void eliminaUnProgramaConMovimientosAnulados() throws Exception {
+        String program = """
+                {"nombre":"Para eliminar","tipo":"Estampillas","negocio":"Café de la Plaza","estado":"Activa",
+                 "reglas":{"sellosMeta":8,"premio":"Un postre","iconoSello":"star","selloPor":"visita","montoMinimo":0,"limitePorDia":5}}""";
+        long programId = json.readTree(mvc.perform(post("/api/v1/loyalty-programs").header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content(program))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        String qrToken = json.readTree(mvc.perform(get("/api/v1/loyalty-programs/" + programId + "/customers").header("Authorization", bearer()))
+                .andReturn().getResponse().getContentAsString()).at("/content/0/qrToken").asText();
+        long cardId = json.readTree(mvc.perform(get("/api/v1/cards/qr/" + qrToken).header("Authorization", bearer()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(post("/api/v1/cards/" + cardId + "/stamps").header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"branchId\":1,\"quantity\":1}"))
+                .andExpect(status().isOk());
+        long transactionId = json.readTree(mvc.perform(get("/api/v1/cards/" + cardId + "/transactions").header("Authorization", bearer()))
+                .andReturn().getResponse().getContentAsString()).at("/content/0/id").asLong();
+        mvc.perform(delete("/api/v1/transactions/" + transactionId).header("Authorization", bearer())).andExpect(status().isNoContent());
+
+        mvc.perform(delete("/api/v1/loyalty-programs/" + programId).header("Authorization", bearer())).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/loyalty-programs/" + programId).header("Authorization", bearer())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/cards/qr/" + qrToken).header("Authorization", bearer())).andExpect(status().isNotFound());
+    }
+
+    @Test
     void respondeResenasYLimitaLocalesPorPlan() throws Exception {
         mvc.perform(patch("/api/v1/reviews/2/reply").header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reply\":\"¡Gracias por tu visita!\"}"))

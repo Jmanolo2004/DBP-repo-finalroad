@@ -154,11 +154,7 @@ public class ProgramService {
     public void delete(Business business, Long id) {
         LoyaltyProgram program = findOwned(business, id);
         List<LoyaltyCard> programCards = cards.findByProgramId(id);
-        Set<Long> cardIds = new HashSet<>();
-        programCards.forEach(card -> cardIds.add(card.getId()));
-        transactions.findByBusinessIdAndVoidedFalse(business.getId()).stream()
-                .filter(tx -> tx.getCard() != null && cardIds.contains(tx.getCard().getId()))
-                .forEach(tx -> tx.setCard(null));
+        transactions.findByCardProgramId(id).forEach(tx -> tx.setCard(null));
         transactions.flush();
         cards.deleteAll(programCards);
         programs.delete(program);

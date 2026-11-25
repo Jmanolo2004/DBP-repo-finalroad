@@ -9,8 +9,12 @@ public final class SurveyDtos {
     private SurveyDtos() {
     }
 
-    /** walletReady: el servidor puede enviar invitaciones (Google Wallet y PUBLIC_WEB_URL configurados). */
-    public record SettingsResponse(boolean enabled, String question, int cooldownDays, boolean walletReady, Instant updatedAt) {
+    /**
+     * walletReady: se puede invitar por el pase (Google Wallet y PUBLIC_WEB_URL configurados).
+     * emailReady: se puede invitar por correo a quien no tiene el pase (PUBLIC_WEB_URL configurado).
+     */
+    public record SettingsResponse(boolean enabled, String question, int cooldownDays, boolean walletReady, boolean emailReady,
+                                   Instant updatedAt) {
     }
 
     public record SettingsRequest(Boolean enabled, String question, Integer cooldownDays) {

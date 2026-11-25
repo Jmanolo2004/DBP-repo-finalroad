@@ -64,6 +64,32 @@ public record CardPassView(Long cardId, String qrToken, String serial, boolean u
                 program.getPrimaryColor(), card.getCustomer().getFullName(), first, second, details, card.getExpiresAt());
     }
 
+    /**
+     * Cuánto le falta a la tarjeta para su próximo premio (Estampillas) o nivel (Niveles); vacío en otros programas
+     * o si ya está en el nivel más alto. unit: "sello(s)" o "puntos". level: número del nivel siguiente (0 en Estampillas).
+     */
+    public record NextReward(int remaining, String unit, String target, int level, boolean close) {
+    }
+
+    public static java.util.Optional<NextReward> nextReward(LoyaltyCard card) {
+        LoyaltyProgram program = card.getProgram();
+        ProgramRules rules = new ProgramRules(program);
+        if (ProgramRules.STAMPS.equals(program.getType())) {
+            int remaining = Math.max(0, rules.stampGoal() - card.getStamps());
+            return java.util.Optional.of(new NextReward(remaining, remaining == 1 ? "sello" : "sellos", rules.reward(), 0, remaining == 1));
+        }
+        if (ProgramRules.LEVELS.equals(program.getType())) {
+            int number = rules.levelFor(card.getPoints());
+            return rules.levels().stream().filter(level -> level.number() == number + 1).findFirst().map(next -> {
+                int remaining = Math.max(0, next.minPoints() - card.getPoints());
+                // "Cerca" = le falta el 10 % o menos de los puntos del nivel siguiente.
+                int threshold = Math.max(1, (int) Math.ceil(next.minPoints() * 0.1));
+                return new NextReward(remaining, "puntos", next.name(), next.number(), remaining > 0 && remaining <= threshold);
+            });
+        }
+        return java.util.Optional.empty();
+    }
+
     static String soles(BigDecimal value) {
         return "S/ " + (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP).toPlainString();
     }

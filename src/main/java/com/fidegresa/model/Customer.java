@@ -65,6 +65,14 @@ public class Customer {
     @Column(length = 20)
     private String signupSource;
 
+    /** Se dio de baja de los correos (null = los recibe si dio su consentimiento). */
+    @Column(name = "email_opt_out_at")
+    private Instant emailOptOutAt;
+
+    /** Token secreto del enlace "darse de baja" de sus correos; se crea con el primer correo. */
+    @Column(name = "email_token", length = 43, unique = true)
+    private String emailToken;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;

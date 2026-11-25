@@ -18,5 +18,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     Optional<Customer> findByBusinessIdAndEmailIgnoreCase(Long businessId, String email);
 
+    Optional<Customer> findByEmailToken(String emailToken);
+
     long countByBranchId(Long branchId);
 }

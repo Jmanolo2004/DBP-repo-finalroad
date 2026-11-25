@@ -2,6 +2,7 @@ package com.fidegresa.survey;
 
 import com.fidegresa.common.ApiException;
 import com.fidegresa.common.DateRange;
+import com.fidegresa.mail.CustomerMailer;
 import com.fidegresa.metrics.ProfitabilityPeriod;
 import com.fidegresa.model.*;
 import com.fidegresa.repository.BranchRepository;
@@ -83,30 +84,39 @@ public class SurveyService {
         return toResponse(settings.save(current));
     }
 
-    /** Las invitaciones salen por el pase de Google Wallet y llevan un enlace a la web pública. */
+    /** Las invitaciones llevan un enlace a la web pública; salen por el pase de Google Wallet o, si no lo tiene, por correo. */
     public boolean walletReady() {
         return wallet.configured() && !webUrl.isEmpty();
     }
 
+    public boolean canInvite() {
+        return !webUrl.isEmpty();
+    }
+
     private SettingsResponse toResponse(SurveySettings value) {
-        return new SettingsResponse(value.isEnabled(), value.getQuestion(), value.getCooldownDays(), walletReady(), value.getUpdatedAt());
+        return new SettingsResponse(value.isEnabled(), value.getQuestion(), value.getCooldownDays(), walletReady(), canInvite(),
+                value.getUpdatedAt());
     }
 
     // ---------- invitaciones ----------
 
-    /** Lo que hay que enviar al pase después de crear la invitación. */
-    public record Invite(Long invitationId, Long cardId, String walletObjectId, String question, String url) {
+    /** Lo que hay que enviar después de crear la invitación. channel: WALLET (mensaje en el pase) o EMAIL. */
+    public record Invite(Long invitationId, String channel, Long customerId, Long cardId, String walletObjectId, String question, String url) {
     }
 
     /**
-     * Crea la invitación si corresponde: encuesta activa, movimiento vigente de una tarjeta con pase de Wallet y
-     * ninguna invitación al mismo cliente en los últimos días configurados.
+     * Crea la invitación si corresponde: encuesta activa, movimiento vigente de una tarjeta, un canal para llegarle
+     * (su pase de Wallet o, si no lo tiene, su correo con consentimiento) y ninguna invitación al mismo cliente
+     * en los últimos días configurados.
      */
     @Transactional
     public Optional<Invite> inviteAfter(Long transactionId) {
-        if (!walletReady()) return Optional.empty();
+        if (!canInvite()) return Optional.empty();
         CardTransaction tx = em.find(CardTransaction.class, transactionId);
-        if (tx == null || tx.isVoided() || tx.getCard() == null || tx.getCard().getWalletObjectId() == null) return Optional.empty();
+        if (tx == null || tx.isVoided() || tx.getCard() == null) return Optional.empty();
+        String channel = wallet.configured() && tx.getCard().getWalletObjectId() != null ? "WALLET"
+                : CustomerMailer.emailable(tx.getCustomer()) ? "EMAIL" : null;
+        if (channel == null) return Optional.empty();
         SurveySettings config = settings.findByBusinessId(tx.getBusiness().getId()).orElse(null);
         if (config == null || !config.isEnabled()) return Optional.empty();
         Customer customer = tx.getCustomer();
@@ -115,7 +125,7 @@ public class SurveyService {
         }
         SurveyInvitation invitation = new SurveyInvitation();
         invitation.setToken(token());
-        invitation.setChannel("WALLET");
+        invitation.setChannel(channel);
         invitation.setCardId(tx.getCard().getId());
         invitation.setTransactionId(tx.getId());
         invitation.setSentAt(Instant.now());
@@ -124,7 +134,8 @@ public class SurveyService {
         invitation.setBranch(tx.getBranch());
         invitation.setBusiness(tx.getBusiness());
         invitations.save(invitation);
-        return Optional.of(new Invite(invitation.getId(), tx.getCard().getId(), tx.getCard().getWalletObjectId(), config.getQuestion(),
+        return Optional.of(new Invite(invitation.getId(), channel, customer.getId(), tx.getCard().getId(), tx.getCard().getWalletObjectId(),
+                config.getQuestion(),
                 webUrl + "/encuesta/" + invitation.getToken()));
     }
 

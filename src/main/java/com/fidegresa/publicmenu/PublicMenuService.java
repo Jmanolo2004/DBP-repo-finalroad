@@ -2,6 +2,7 @@ package com.fidegresa.publicmenu;
 
 import com.fidegresa.common.ApiException;
 import com.fidegresa.common.Texts;
+import com.fidegresa.mail.CustomerJoinedEvent;
 import com.fidegresa.file.FileKind;
 import com.fidegresa.file.StoredFileService;
 import com.fidegresa.invitation.InvitationService;
@@ -62,11 +63,14 @@ public class PublicMenuService {
     private final String consentVersion;
     private final String webUrl;
 
+    private final org.springframework.context.ApplicationEventPublisher events;
+
     public PublicMenuService(BranchRepository branches, BranchCatalogRepository catalogs, CatalogFileRepository catalogFiles,
                              BranchInvitationRepository invitations, InvitationService invitationService, LoyaltyProgramRepository programs,
                              CustomerRepository customers, LoyaltyCardRepository cards, CardIssuer cardIssuer, StoredFileService storedFiles,
                              PublicSlugs slugs, @Value("${app.public.consent-version:2026-11}") String consentVersion,
-                             @Value("${app.public.web-url:}") String webUrl) {
+                             @Value("${app.public.web-url:}") String webUrl,
+                             org.springframework.context.ApplicationEventPublisher events) {
         this.branches = branches;
         this.catalogs = catalogs;
         this.catalogFiles = catalogFiles;
@@ -79,6 +83,7 @@ public class PublicMenuService {
         this.storedFiles = storedFiles;
         this.slugs = slugs;
         this.consentVersion = consentVersion;
+        this.events = events;
         this.webUrl = webUrl == null ? "" : webUrl.trim().replaceAll("/+$", "");
     }
 
@@ -189,6 +194,7 @@ public class PublicMenuService {
         customer.setSignupSource("MENU_QR");
         customers.save(customer);
         LoyaltyCard card = cards.save(cardIssuer.newCard(customer, program));
+        events.publishEvent(new CustomerJoinedEvent(customer.getId(), card.getId())); // correo de bienvenida, tras el commit
         return new JoinResult(branch, new JoinResponse(false, fullName, cardInfo(card, program)), true);
     }
 

@@ -2,6 +2,7 @@ package com.fidegresa.account;
 
 import com.fidegresa.common.ApiException;
 import com.fidegresa.common.Plans;
+import com.fidegresa.file.StoredFileService;
 import com.fidegresa.model.AppUser;
 import com.fidegresa.model.Business;
 import com.fidegresa.model.Role;
@@ -21,11 +22,14 @@ public class AccountController {
     private final CurrentUser currentUser;
     private final BusinessRepository businesses;
     private final EntityManager entityManager;
+    private final StoredFileService storedFiles;
 
-    public AccountController(CurrentUser currentUser, BusinessRepository businesses, EntityManager entityManager) {
+    public AccountController(CurrentUser currentUser, BusinessRepository businesses, EntityManager entityManager,
+                             StoredFileService storedFiles) {
         this.currentUser = currentUser;
         this.businesses = businesses;
         this.entityManager = entityManager;
+        this.storedFiles = storedFiles;
     }
 
     /** Sube al siguiente plan. El pago es simulado: no se cobra nada, pero el cambio de plan sí se guarda. */
@@ -63,6 +67,8 @@ public class AccountController {
                 "delete from RefreshToken t where t.user.id in (select u.id from AppUser u where u.business.id = :id)",
                 "delete from AppUser u where u.business.id = :id",
                 "delete from Branch b where b.business.id = :id"};
+        // Los archivos primero: su contenido puede estar fuera de la base (S3) y se borra al confirmar.
+        storedFiles.deleteAllForBusiness(businessId);
         entityManager.createQuery("select m from TeamMember m where m.business.id = :id", com.fidegresa.model.TeamMember.class)
                 .setParameter("id", businessId).getResultList().forEach(entityManager::remove);
         entityManager.flush();

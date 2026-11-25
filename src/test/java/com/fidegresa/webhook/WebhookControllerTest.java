@@ -215,6 +215,17 @@ class WebhookControllerTest {
         verify(sender, times(1)).send(eq("https://ejemplo.com/nuevo"), anyString(), any());
     }
 
+    @Test
+    void eliminaLaCuentaConWebhookEHistorial() throws Exception {
+        Shop shop = shop("cuenta");
+        register(shop, "https://ejemplo.com/cuenta");
+        stamp(shop, 1);
+        awaitStatuses(shop, 1, "DELIVERED");
+        mvc.perform(delete("/api/v1/account").header("Authorization", shop.token())).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/branches").header("Authorization", shop.token())).andExpect(status().isUnauthorized());
+        assertThat(users.findByEmailIgnoreCase("cuenta@webhooks.pe")).isEmpty();
+    }
+
     private Shop shop(String name) throws Exception {
         String register = """
                 {"email":"%s@webhooks.pe","password":"Clave12345","businessName":"Local %s","firstName":"Rosa","lastName":"Díaz",

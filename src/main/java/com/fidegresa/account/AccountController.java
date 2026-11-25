@@ -67,6 +67,8 @@ public class AccountController {
                 .setParameter("id", businessId).getResultList().forEach(entityManager::remove);
         entityManager.flush();
         for (String statement : statements) entityManager.createQuery(statement).setParameter("id", businessId).executeUpdate();
+        // El usuario en sesión todavía apunta al negocio: se suelta antes de eliminarlo.
+        entityManager.clear();
         businesses.deleteById(businessId);
         return ResponseEntity.noContent().build();
     }

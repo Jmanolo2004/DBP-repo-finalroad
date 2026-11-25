@@ -1,10 +1,10 @@
-package com.fidegresa.catalog;
+package com.fidegresa.common.catalog;
 
-import com.fidegresa.catalog.CatalogDtos.ActiveRequest;
-import com.fidegresa.catalog.CatalogDtos.CatalogResponse;
-import com.fidegresa.catalog.CatalogDtos.CatalogsResponse;
-import com.fidegresa.catalog.CatalogDtos.OrderRequest;
-import com.fidegresa.catalog.CatalogDtos.WebRequest;
+import com.fidegresa.common.catalog.CatalogDtos.ActiveRequest;
+import com.fidegresa.common.catalog.CatalogDtos.CatalogResponse;
+import com.fidegresa.common.catalog.CatalogDtos.CatalogsResponse;
+import com.fidegresa.common.catalog.CatalogDtos.OrderRequest;
+import com.fidegresa.common.catalog.CatalogDtos.WebRequest;
 import com.fidegresa.model.Business;
 import com.fidegresa.security.CurrentUser;
 import org.springframework.http.HttpHeaders;

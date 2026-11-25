@@ -1,4 +1,4 @@
-package com.fidegresa.catalog;
+package com.fidegresa.common.catalog;
 
 import java.time.Instant;
 import java.util.List;

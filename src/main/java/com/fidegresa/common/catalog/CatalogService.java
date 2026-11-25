@@ -1,8 +1,8 @@
-package com.fidegresa.catalog;
+package com.fidegresa.common.catalog;
 
-import com.fidegresa.catalog.CatalogDtos.CatalogFileResponse;
-import com.fidegresa.catalog.CatalogDtos.CatalogResponse;
-import com.fidegresa.catalog.CatalogDtos.CatalogsResponse;
+import com.fidegresa.common.catalog.CatalogDtos.CatalogFileResponse;
+import com.fidegresa.common.catalog.CatalogDtos.CatalogResponse;
+import com.fidegresa.common.catalog.CatalogDtos.CatalogsResponse;
 import com.fidegresa.common.ApiException;
 import com.fidegresa.file.FileKind;
 import com.fidegresa.file.StoredFileService;

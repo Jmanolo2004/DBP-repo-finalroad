@@ -1,6 +1,7 @@
 package com.fidegresa.metrics;
 
 import com.fidegresa.common.ApiException;
+import com.fidegresa.common.DateRange;
 import com.fidegresa.metrics.ProfitabilityCalculator.Movement;
 import com.fidegresa.metrics.ProfitabilityCalculator.Program;
 import com.fidegresa.metrics.ProfitabilityCalculator.ProgramRow;
@@ -15,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -26,9 +26,6 @@ import java.util.stream.Collectors;
 /** Rentabilidad del negocio: cuánto gastaron los clientes recurrentes y cuánto costaron los premios. */
 @Service
 public class ProfitabilityService {
-    private static final int MIN_YEAR = 2000;
-    private static final int MAX_YEAR = 2100;
-
     private final MetricsTransactionRepository transactions;
     private final LoyaltyProgramRepository programs;
     private final BranchRepository branches;
@@ -66,14 +63,8 @@ public class ProfitabilityService {
     }
 
     private static ProfitabilityPeriod period(String from, String to) {
-        LocalDate today = MetricsSupport.today();
-        LocalDate end = MetricsSupport.parseDate(to, today);
-        LocalDate start = MetricsSupport.parseDate(from, end.withDayOfMonth(1));
-        if (start.isAfter(end)) throw ApiException.badRequest("La fecha de inicio no puede ser posterior a la fecha final.");
-        if (start.getYear() < MIN_YEAR || end.getYear() > MAX_YEAR) {
-            throw ApiException.badRequest("Elige fechas entre los años " + MIN_YEAR + " y " + MAX_YEAR + ".");
-        }
-        return new ProfitabilityPeriod(start, end);
+        DateRange range = DateRange.parse(from, to);
+        return new ProfitabilityPeriod(range.from(), range.to());
     }
 
     private List<Movement> movements(Long businessId, ProfitabilityPeriod period, Long branchId) {

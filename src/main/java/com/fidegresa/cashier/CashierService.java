@@ -6,6 +6,7 @@ import com.fidegresa.common.PageResponse;
 import com.fidegresa.model.*;
 import com.fidegresa.repository.BranchRepository;
 import com.fidegresa.security.CurrentUser;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,14 +43,16 @@ public class CashierService {
     private final BranchRepository branches;
     private final CurrentUser currentUser;
     private final CashierMapper mapper;
+    private final ApplicationEventPublisher events;
 
     public CashierService(CashierCardRepository cards, CashierTransactionRepository transactions, BranchRepository branches,
-                          CurrentUser currentUser, CashierMapper mapper) {
+                          CurrentUser currentUser, CashierMapper mapper, ApplicationEventPublisher events) {
         this.cards = cards;
         this.transactions = transactions;
         this.branches = branches;
         this.currentUser = currentUser;
         this.mapper = mapper;
+        this.events = events;
     }
 
     // ------------------------------------------------------------------ lectura
@@ -246,6 +249,7 @@ public class CashierService {
         }
         revert(card, tx);
         tx.setVoided(true);
+        events.publishEvent(new CardMovementEvent(tx, true));
     }
 
     private void revert(LoyaltyCard card, CardTransaction tx) {
@@ -357,6 +361,7 @@ public class CashierService {
         tx.setPerformedBy(user);
         tx.setBusiness(user.getBusiness());
         transactions.save(tx);
+        events.publishEvent(new CardMovementEvent(tx, false));
     }
 
     private static BigDecimal validAmount(BigDecimal amount) {

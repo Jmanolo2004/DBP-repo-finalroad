@@ -52,6 +52,8 @@ public class AccountController {
         if (user.getRole() != Role.ADMIN) throw ApiException.forbidden("Solo una cuenta administradora puede eliminar la cuenta.");
         Long businessId = user.getBusiness().getId();
         String[] statements = {
+                "delete from WebhookDelivery d where d.business.id = :id",
+                "delete from WebhookEndpoint e where e.business.id = :id",
                 "delete from CardTransaction t where t.business.id = :id",
                 "delete from Review r where r.business.id = :id",
                 "delete from LoyaltyCard c where c.program.id in (select p.id from LoyaltyProgram p where p.business.id = :id)",

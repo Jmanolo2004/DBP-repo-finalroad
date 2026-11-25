@@ -76,6 +76,19 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Exportación de reportes a Excel (.xlsx) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.5.1</version>
+        </dependency>
+
+        <!-- Cliente HTTP de los webhooks (permite validar la dirección al conectar) -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+        </dependency>
+
         <!-- Soporte para correo electrónico -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

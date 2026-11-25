@@ -88,10 +88,12 @@ public class CashierController {
 
     @GetMapping("/transactions")
     public PageResponse<TransactionDto> transactions(@RequestParam(required = false) Long branchId,
+                                                     @RequestParam(required = false) Long programId,
+                                                     @RequestParam(required = false) String programType,
                                                      @RequestParam(required = false) Integer page,
                                                      @RequestParam(required = false) Integer size,
                                                      @RequestParam(required = false) String sort) {
-        return service.businessTransactions(branchId, page, size, sort);
+        return service.businessTransactions(branchId, programId, programType, page, size, sort);
     }
 
     @DeleteMapping("/transactions/{id}")

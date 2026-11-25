@@ -52,9 +52,10 @@ public class ReferralController {
         return referrals.ofCustomer(businessId(), id);
     }
 
+    /** "Recomienda Fidegresa": también lo ve la caja (rol CASHIER) para compartir el enlace con otros dueños. */
     @GetMapping("/business-referrals")
     public BusinessReferralSummary businessReferrals(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return businessReferrals.summary(businessId(), page, size);
+        return businessReferrals.summary(currentUser.businessId(), page, size);
     }
 
     @GetMapping("/public/referrals/{code}")

@@ -2,7 +2,9 @@ package com.fidegresa.referral;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fidegresa.model.AppUser;
 import com.fidegresa.model.Customer;
+import com.fidegresa.model.Role;
 import com.fidegresa.model.LoyaltyCard;
 import com.fidegresa.model.LoyaltyProgram;
 import com.fidegresa.model.Referral;
@@ -55,6 +57,8 @@ class ReferralTest {
     TransactionTemplate tx;
     @Autowired
     EntityManager em;
+    @Autowired
+    org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     record Shop(String token, long businessId, long branchId, long programId, String slug) {
     }
@@ -81,8 +85,26 @@ class ReferralTest {
         assertThat(converted.get("converted").asLong()).isEqualTo(1);
         assertThat(converted.at("/referrals/content/0/status").asText()).isEqualTo("CONVERTED");
         assertThat(converted.at("/referrals/content/0/convertedAt").isNull()).isFalse();
+        // La caja del negocio también ve el enlace (para compartirlo desde la app), con los datos de su propio negocio.
+        JsonNode fromCashier = read(get("/api/v1/business-referrals"), cashierToken(inviter.businessId()));
+        assertThat(fromCashier.get("code").asText()).isEqualTo(code);
+        assertThat(fromCashier.get("converted").asLong()).isEqualTo(1);
         call(delete("/api/v1/account"), invited.token()).andExpect(status().isNoContent());
         assertThat(read(get("/api/v1/business-referrals"), inviter.token()).get("registered").asLong()).isZero();
+    }
+
+    private String cashierToken(long businessId) throws Exception {
+        AppUser cashier = new AppUser();
+        cashier.setEmail("caja-" + UUID.randomUUID().toString().substring(0, 8) + "@negocio.pe");
+        cashier.setFullName("Caja");
+        cashier.setPasswordHash(passwordEncoder.encode("Clave12345"));
+        cashier.setRole(Role.CASHIER);
+        cashier.setBusiness(tx.execute(status -> em.find(com.fidegresa.model.Business.class, businessId)));
+        users.save(cashier);
+        String login = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("email", cashier.getEmail(), "password", "Clave12345"))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return "Bearer " + tree(login).get("token").asText();
     }
 
     @Test

@@ -83,12 +83,35 @@ public class CashierService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<TransactionDto> businessTransactions(Long branchId, Integer page, Integer size, String sort) {
+    /**
+     * Historial del negocio del JWT. Filtros opcionales: local, una tarjeta (programId) o un tipo de tarjeta
+     * (programType: STAMPS, CASHBACK, LEVELS o GIFT_CARD, o su nombre en español). Un programa de otro negocio no trae nada.
+     */
+    public PageResponse<TransactionDto> businessTransactions(Long branchId, Long programId, String programType, Integer page, Integer size,
+                                                             String sort) {
         Long businessId = currentUser.businessId();
         Pageable pageable = pageable(page, size, sort);
-        if (branchId == null) return toPage(transactions.pageByBusiness(businessId, CASHIER_TYPES, pageable));
-        branches.findByIdAndBusinessId(branchId, businessId).orElseThrow(() -> ApiException.notFound("No encontramos el local seleccionado."));
-        return toPage(transactions.pageByBranch(businessId, branchId, CASHIER_TYPES, pageable));
+        if (branchId != null) {
+            branches.findByIdAndBusinessId(branchId, businessId).orElseThrow(() -> ApiException.notFound("No encontramos el local seleccionado."));
+        }
+        String type = storedProgramType(programType);
+        if (programId == null && type == null) {
+            return toPage(branchId == null ? transactions.pageByBusiness(businessId, CASHIER_TYPES, pageable)
+                    : transactions.pageByBranch(businessId, branchId, CASHIER_TYPES, pageable));
+        }
+        return toPage(transactions.pageFiltered(businessId, branchId, programId, type, CASHIER_TYPES, pageable));
+    }
+
+    /** STAMPS/CASHBACK/LEVELS/GIFT_CARD (o el nombre en español) al tipo guardado en el programa; null si no se filtra. */
+    private static String storedProgramType(String value) {
+        if (value == null || value.isBlank()) return null;
+        return switch (value.trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "STAMPS", "ESTAMPILLAS" -> ProgramRules.STAMPS;
+            case "CASHBACK" -> ProgramRules.CASHBACK;
+            case "LEVELS", "NIVELES" -> ProgramRules.LEVELS;
+            case "GIFT_CARD", "GIFTCARD" -> ProgramRules.GIFT;
+            default -> throw ApiException.badRequest("Tipo de tarjeta no válido. Usa STAMPS, CASHBACK, LEVELS o GIFT_CARD.");
+        };
     }
 
     // ------------------------------------------------------------------ movimientos

@@ -27,6 +27,8 @@ public final class ProgramViews {
         view.put("vigenciaMeses", program.getValidityMonths());
         view.put("terminos", program.getTerms());
         view.put("reglas", program.getRules());
+        view.put("rewardCost", program.getRewardCost());
+        view.put("averageTicket", program.getAverageTicket());
         view.put("creadaEn", program.getCreatedAt());
         view.put("actualizadaEn", program.getUpdatedAt());
         return view;

@@ -67,7 +67,11 @@ public class AccountController {
                 "delete from RefreshToken t where t.user.id in (select u.id from AppUser u where u.business.id = :id)",
                 "delete from AppUser u where u.business.id = :id",
                 "delete from Branch b where b.business.id = :id"};
-        // Los archivos primero: su contenido puede estar fuera de la base (S3) y se borra al confirmar.
+        // Los catálogos apuntan a los archivos: se borran antes que ellos.
+        entityManager.createQuery("delete from CatalogFile f where f.catalog.id in (select c.id from BranchCatalog c where c.business.id = :id)")
+                .setParameter("id", businessId).executeUpdate();
+        entityManager.createQuery("delete from BranchCatalog c where c.business.id = :id").setParameter("id", businessId).executeUpdate();
+        // Los archivos después: su contenido puede estar fuera de la base (S3) y se borra al confirmar.
         storedFiles.deleteAllForBusiness(businessId);
         entityManager.createQuery("select m from TeamMember m where m.business.id = :id", com.fidegresa.model.TeamMember.class)
                 .setParameter("id", businessId).getResultList().forEach(entityManager::remove);

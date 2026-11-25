@@ -2,6 +2,7 @@ package com.fidegresa.cashier;
 
 import com.fidegresa.cashier.CashierDtos.*;
 import com.fidegresa.common.PageResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,9 +12,11 @@ import org.springframework.web.bind.annotation.*;
 public class CashierController {
     private static final String IDEMPOTENCY = "Idempotency-Key";
     private final CashierService service;
+    private final CardRegistrationService registration;
 
-    public CashierController(CashierService service) {
+    public CashierController(CashierService service, CardRegistrationService registration) {
         this.service = service;
+        this.registration = registration;
     }
 
     @GetMapping("/cards/qr/{qrToken}")
@@ -43,6 +46,19 @@ public class CashierController {
     public CardDto balanceCharges(@PathVariable Long id, @RequestBody(required = false) AmountRequest body,
                                   @RequestHeader(value = IDEMPOTENCY, required = false) String key) {
         return service.chargeBalance(id, body, key);
+    }
+
+    /** Registra en caja a un cliente nuevo y le entrega su tarjeta (con consentimiento). 201 si es nuevo, 200 si ya existía. */
+    @PostMapping("/cards/register")
+    public ResponseEntity<CardRegistrationService.RegisterResponse> register(@RequestBody(required = false) CardRegistrationService.RegisterRequest body) {
+        CardRegistrationService.RegisterResponse response = registration.register(body);
+        return ResponseEntity.status(response.alreadyRegistered() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
+    }
+
+    /** Programas a los que se puede unir un cliente en el local y el texto de consentimiento que se le muestra. */
+    @GetMapping("/branches/{branchId}/registration-options")
+    public com.fidegresa.publicmenu.PublicMenuService.RegistrationOptions registrationOptions(@PathVariable Long branchId) {
+        return registration.options(branchId);
     }
 
     /** Lo que dibuja la tarjeta (sellos, saldo, nivel o gift card), con su progreso y colores con buen contraste. */

@@ -5,12 +5,12 @@ import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 
 /** Rango de fechas con ambos extremos incluidos. */
-record ProfitabilityPeriod(LocalDate from, LocalDate to) {
+public record ProfitabilityPeriod(LocalDate from, LocalDate to) {
     /**
      * Periodo con el que se compara: si va del día 1 a otro día del mismo mes, los mismos días del mes anterior
      * (o el mes anterior completo si este también lo es); si no, el rango inmediatamente anterior de igual duración.
      */
-    ProfitabilityPeriod previous() {
+    public ProfitabilityPeriod previous() {
         YearMonth month = YearMonth.from(from);
         if (from.getDayOfMonth() == 1 && month.equals(YearMonth.from(to))) {
             YearMonth previousMonth = month.minusMonths(1);

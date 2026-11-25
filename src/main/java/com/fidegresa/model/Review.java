@@ -29,6 +29,10 @@ public class Review {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** De dónde vino: null = reseña existente o cargada, SURVEY = encuesta después de la visita. */
+    @Column(length = 20)
+    private String source;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;

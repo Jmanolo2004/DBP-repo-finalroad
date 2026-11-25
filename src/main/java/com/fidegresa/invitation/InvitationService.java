@@ -126,7 +126,8 @@ public class InvitationService {
 
     // ---------- apoyo ----------
 
-    String status(BranchInvitation invitation) {
+    /** LIVE, PAUSED, EXPIRED o INCOMPLETE (ver InvitationDtos). */
+    public String status(BranchInvitation invitation) {
         if (!invitation.isActive()) return "PAUSED";
         if (invitation.getEndsOn() != null && invitation.getEndsOn().isBefore(LocalDate.now(clock))) return "EXPIRED";
         if (!available(invitation.getProgram(), invitation.getBranch())) return "INCOMPLETE";

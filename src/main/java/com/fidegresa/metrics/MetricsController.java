@@ -17,13 +17,15 @@ public class MetricsController {
     private final MetricsService metricsService;
     private final MetricsOverviewService overviewService;
     private final ProfitabilityService profitabilityService;
+    private final MenuMetricsService menuMetricsService;
     private final CurrentUser currentUser;
 
     public MetricsController(MetricsService metricsService, MetricsOverviewService overviewService,
-                             ProfitabilityService profitabilityService, CurrentUser currentUser) {
+                             ProfitabilityService profitabilityService, MenuMetricsService menuMetricsService, CurrentUser currentUser) {
         this.metricsService = metricsService;
         this.overviewService = overviewService;
         this.profitabilityService = profitabilityService;
+        this.menuMetricsService = menuMetricsService;
         this.currentUser = currentUser;
     }
 
@@ -61,6 +63,13 @@ public class MetricsController {
     public ProfitabilityResponse profitability(@RequestParam(required = false) String from, @RequestParam(required = false) String to,
                                                @RequestParam(required = false) Long branchId) {
         return profitabilityService.profitability(currentUser.businessId(), from, to, branchId);
+    }
+
+    /** Menú público (QR): vistas, registros y conversión por local y por día. */
+    @GetMapping("/menu")
+    public MenuMetricsResponse menu(@RequestParam(required = false) String from, @RequestParam(required = false) String to,
+                                    @RequestParam(required = false) Long branchId) {
+        return menuMetricsService.menu(currentUser.businessId(), from, to, branchId);
     }
 
     private static MetricsOverviewService.Query query(Map<String, String> params) {

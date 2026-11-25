@@ -47,6 +47,10 @@ public class Branch {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Identificador del menú público (/m/{slug}). Se asigna una vez y no cambia al renombrar el local. */
+    @Column(name = "public_slug", length = 80, unique = true)
+    private String publicSlug;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "business_id", nullable = false)
     private Business business;

@@ -13,6 +13,9 @@ public interface BranchInvitationRepository extends JpaRepository<BranchInvitati
     @EntityGraph(attributePaths = {"program", "image"})
     Optional<BranchInvitation> findByBranchId(Long branchId);
 
+    @EntityGraph(attributePaths = {"program", "image", "branch"})
+    Optional<BranchInvitation> findByImageId(Long imageId);
+
     /** Al eliminar un programa, las invitaciones que lo usaban quedan sin programa (incompletas). */
     @Modifying
     @Query("update BranchInvitation i set i.program = null where i.program.id = :programId")

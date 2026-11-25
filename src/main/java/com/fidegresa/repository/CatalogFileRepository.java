@@ -13,4 +13,7 @@ public interface CatalogFileRepository extends JpaRepository<CatalogFile, Long> 
 
     @EntityGraph(attributePaths = "file")
     Optional<CatalogFile> findByCatalogIdAndFileId(Long catalogId, Long fileId);
+
+    @EntityGraph(attributePaths = {"file", "catalog", "catalog.branch"})
+    Optional<CatalogFile> findByFileId(Long fileId);
 }

@@ -55,6 +55,16 @@ public class Customer {
     @Column(nullable = false)
     private Instant registeredAt = Instant.now();
 
+    /** Cuándo aceptó el tratamiento de sus datos (Ley 29733) y qué versión del texto. Null en clientes antiguos. */
+    private Instant consentAt;
+
+    @Column(length = 20)
+    private String consentVersion;
+
+    /** Dónde se registró: MENU_QR (menú público). Null = desde el panel o antes de existir este dato. */
+    @Column(length = 20)
+    private String signupSource;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;

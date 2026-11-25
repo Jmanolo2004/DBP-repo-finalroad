@@ -35,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class CashierControllerTest {
     @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactions;
+    @Autowired
     MockMvc mvc;
     @Autowired
     ObjectMapper json;
@@ -242,12 +244,17 @@ class CashierControllerTest {
 
     // ---- ayudas ----
 
+    /** Dentro de una transacción: en PostgreSQL el logo y la portada del programa (@Lob) no se leen en auto-commit. */
     private LoyaltyCard card(String programName, int index) {
-        List<LoyaltyCard> found = cardRepository.findByProgramBusinessId(businessId).stream()
-                .filter(c -> c.getProgram().getName().equals(programName))
-                .sorted(Comparator.comparing(LoyaltyCard::getId))
-                .toList();
-        return found.get(index);
+        return transactions.execute(status -> {
+            List<LoyaltyCard> found = cardRepository.findByProgramBusinessId(businessId).stream()
+                    .filter(c -> c.getProgram().getName().equals(programName))
+                    .sorted(Comparator.comparing(LoyaltyCard::getId))
+                    .toList();
+            LoyaltyCard card = found.get(index);
+            org.hibernate.Hibernate.initialize(card.getCustomer());
+            return card;
+        });
     }
 
     /** Ajusta la tarjeta directo en la base para dejarla en un estado conocido. */

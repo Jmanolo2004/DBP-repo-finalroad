@@ -23,7 +23,9 @@ public final class AuthDtos {
             Boolean simulatedPaymentConfirmed,
             String district,
             String category,
-            String address) {
+            String address,
+            /** Opcional: código del negocio que recomendó Fidegresa (enlace /unete/:code). */
+            String referralCode) {
     }
 
     public record RefreshRequest(@NotBlank(message = "Falta el refresh token") String refreshToken) {

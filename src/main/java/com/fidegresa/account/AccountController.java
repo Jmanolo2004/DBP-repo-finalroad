@@ -2,6 +2,7 @@ package com.fidegresa.account;
 
 import com.fidegresa.common.ApiException;
 import com.fidegresa.common.Plans;
+import com.fidegresa.file.StoredFileService;
 import com.fidegresa.model.AppUser;
 import com.fidegresa.model.Business;
 import com.fidegresa.model.Role;
@@ -21,11 +22,14 @@ public class AccountController {
     private final CurrentUser currentUser;
     private final BusinessRepository businesses;
     private final EntityManager entityManager;
+    private final StoredFileService storedFiles;
 
-    public AccountController(CurrentUser currentUser, BusinessRepository businesses, EntityManager entityManager) {
+    public AccountController(CurrentUser currentUser, BusinessRepository businesses, EntityManager entityManager,
+                             StoredFileService storedFiles) {
         this.currentUser = currentUser;
         this.businesses = businesses;
         this.entityManager = entityManager;
+        this.storedFiles = storedFiles;
     }
 
     /** Sube al siguiente plan. El pago es simulado: no se cobra nada, pero el cambio de plan sí se guarda. */
@@ -52,6 +56,8 @@ public class AccountController {
         if (user.getRole() != Role.ADMIN) throw ApiException.forbidden("Solo una cuenta administradora puede eliminar la cuenta.");
         Long businessId = user.getBusiness().getId();
         String[] statements = {
+                "delete from WebhookDelivery d where d.business.id = :id",
+                "delete from WebhookEndpoint e where e.business.id = :id",
                 "delete from CardTransaction t where t.business.id = :id",
                 "delete from Review r where r.business.id = :id",
                 "delete from LoyaltyCard c where c.program.id in (select p.id from LoyaltyProgram p where p.business.id = :id)",
@@ -61,10 +67,29 @@ public class AccountController {
                 "delete from RefreshToken t where t.user.id in (select u.id from AppUser u where u.business.id = :id)",
                 "delete from AppUser u where u.business.id = :id",
                 "delete from Branch b where b.business.id = :id"};
+        // Promociones: sus destinatarios apuntan a clientes y la promoción a un programa.
+        // Encuestas y resúmenes: apuntan a reseñas, clientes y locales.
+        for (String entity : new String[]{"WalletMessage", "PromotionRecipient", "Promotion", "SurveyInvitation", "SurveySettings", "ReviewSummary",
+                "EmailSend", "EmailCampaign", "EmailAutomation", "SegmentSettings", "Referral", "ReferralSettings", "ReferralLinkStat"}) {
+            entityManager.createQuery("delete from " + entity + " x where x.business.id = :id").setParameter("id", businessId).executeUpdate();
+        }
+        entityManager.createQuery("delete from BusinessReferral r where r.referrer.id = :id or r.referred.id = :id")
+                .setParameter("id", businessId).executeUpdate();
+        entityManager.createQuery("delete from MenuDailyStat s where s.business.id = :id").setParameter("id", businessId).executeUpdate();
+        // La invitación apunta a un programa y a una imagen: se borra antes que ellos.
+        entityManager.createQuery("delete from BranchInvitation i where i.business.id = :id").setParameter("id", businessId).executeUpdate();
+        // Los catálogos apuntan a los archivos: se borran antes que ellos.
+        entityManager.createQuery("delete from CatalogFile f where f.catalog.id in (select c.id from BranchCatalog c where c.business.id = :id)")
+                .setParameter("id", businessId).executeUpdate();
+        entityManager.createQuery("delete from BranchCatalog c where c.business.id = :id").setParameter("id", businessId).executeUpdate();
+        // Los archivos después: su contenido puede estar fuera de la base (S3) y se borra al confirmar.
+        storedFiles.deleteAllForBusiness(businessId);
         entityManager.createQuery("select m from TeamMember m where m.business.id = :id", com.fidegresa.model.TeamMember.class)
                 .setParameter("id", businessId).getResultList().forEach(entityManager::remove);
         entityManager.flush();
         for (String statement : statements) entityManager.createQuery(statement).setParameter("id", businessId).executeUpdate();
+        // El usuario en sesión todavía apunta al negocio: se suelta antes de eliminarlo.
+        entityManager.clear();
         businesses.deleteById(businessId);
         return ResponseEntity.noContent().build();
     }

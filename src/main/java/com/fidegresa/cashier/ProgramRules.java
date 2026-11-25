@@ -48,6 +48,18 @@ final class ProgramRules {
         return text.isEmpty() ? "Premio del programa" : text;
     }
 
+    /** Ícono del sello: star, reward o card. */
+    String stampIcon() {
+        Object icon = rules.get("iconoSello");
+        return icon instanceof String text && List.of("star", "reward", "card").contains(text) ? text : "star";
+    }
+
+    /** Mensaje de la gift card. */
+    String giftMessage() {
+        String text = Texts.optional(rules.get("mensajeRegalo"), 120);
+        return text.isEmpty() ? null : text;
+    }
+
     /** true si el sello se da por compra mínima (y no por visita). */
     boolean stampByMinimumPurchase() {
         return Texts.normalize(String.valueOf(rules.getOrDefault("selloPor", "visita"))).contains("compra");

@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -68,6 +68,14 @@ public class LoyaltyProgram {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "json")
     private Map<String, Object> rules = new LinkedHashMap<>();
+
+    /** Costo real del premio para el negocio, en soles; null = sin configurar. */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal rewardCost;
+
+    /** Ticket promedio en soles, para visitas sin monto; null = sin configurar. */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal averageTicket;
 
     @Column(nullable = false)
     private Instant createdAt = Instant.now();

@@ -7,10 +7,14 @@ import com.fidegresa.data.BusinessData;
 import com.fidegresa.data.BusinessDataLoader;
 import com.fidegresa.data.Views;
 import com.fidegresa.model.*;
+import com.fidegresa.promotion.PromotionService;
+import com.fidegresa.referral.BusinessReferralService;
+import com.fidegresa.referral.ReferralService;
 import com.fidegresa.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -33,10 +37,18 @@ public class ProgramService {
     private final CardTransactionRepository transactions;
     private final BusinessDataLoader loader;
     private final CardIssuer cardIssuer;
+    private final BranchInvitationRepository invitations;
+    private final PromotionService promotions;
+    private final ReferralService referrals;
+    private final BusinessReferralService businessReferrals;
+    private static final BigDecimal MAX_MONEY = new BigDecimal("99999.99");
+
 
     public ProgramService(LoyaltyProgramRepository programs, BranchRepository branches, CustomerRepository customers,
                           LoyaltyCardRepository cards, CardTransactionRepository transactions, BusinessDataLoader loader,
-                          CardIssuer cardIssuer) {
+                          CardIssuer cardIssuer, BranchInvitationRepository invitations,
+                          PromotionService promotions, @org.springframework.context.annotation.Lazy ReferralService referrals,
+                          BusinessReferralService businessReferrals) {
         this.programs = programs;
         this.branches = branches;
         this.customers = customers;
@@ -44,6 +56,10 @@ public class ProgramService {
         this.transactions = transactions;
         this.loader = loader;
         this.cardIssuer = cardIssuer;
+        this.invitations = invitations;
+        this.promotions = promotions;
+        this.referrals = referrals;
+        this.businessReferrals = businessReferrals;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +117,7 @@ public class ProgramService {
         apply(program, business, body, true);
         programs.save(program);
         issueIfActive(program);
+        businessReferrals.programCreated(business.getId()); // si llegó recomendado, ya es "convertido"
         return detail(business, program.getId());
     }
 
@@ -140,6 +157,8 @@ public class ProgramService {
         copy.setValidityMonths(current.getValidityMonths());
         copy.setTerms(current.getTerms());
         copy.setRules(new LinkedHashMap<>(current.getRules()));
+        copy.setRewardCost(current.getRewardCost());
+        copy.setAverageTicket(current.getAverageTicket());
         programs.save(copy);
         return detail(business, copy.getId());
     }
@@ -149,13 +168,12 @@ public class ProgramService {
     public void delete(Business business, Long id) {
         LoyaltyProgram program = findOwned(business, id);
         List<LoyaltyCard> programCards = cards.findByProgramId(id);
-        Set<Long> cardIds = new HashSet<>();
-        programCards.forEach(card -> cardIds.add(card.getId()));
-        transactions.findByBusinessIdAndVoidedFalse(business.getId()).stream()
-                .filter(tx -> tx.getCard() != null && cardIds.contains(tx.getCard().getId()))
-                .forEach(tx -> tx.setCard(null));
+        transactions.findByCardProgramId(id).forEach(tx -> tx.setCard(null));
         transactions.flush();
+        promotions.deleteForProgram(id); // sus promociones solo llegaban a tarjetas de este programa
+        referrals.deleteForProgram(id);
         cards.deleteAll(programCards);
+        invitations.clearProgram(id); // la invitación del local queda sin programa (incompleta)
         programs.delete(program);
     }
 
@@ -310,6 +328,10 @@ public class ProgramService {
         program.setValidityMonths(months);
         program.setTerms(Texts.optional(body.getOrDefault("terminos", program.getTerms()), 2000));
         program.setRules(sanitizeRules(type, rules));
+        program.setRewardCost(optionalMoney(body, "rewardCost", program.getRewardCost(),
+                "El costo del premio debe ser un monto entre S/ 0.00 y S/ 99999.99, con hasta 2 decimales."));
+        program.setAverageTicket(optionalMoney(body, "averageTicket", program.getAverageTicket(),
+                "El ticket promedio debe ser un monto entre S/ 0.00 y S/ 99999.99, con hasta 2 decimales."));
         program.setUpdatedAt(Instant.now());
         if (isNew) program.setCreatedAt(Instant.now());
     }
@@ -390,6 +412,23 @@ public class ProgramService {
     /** Guarda 50 en lugar de 50.0 cuando el número es entero. */
     private static Number compact(double value) {
         return value == Math.rint(value) ? (Number) (long) value : (Number) value;
+    }
+
+    /** Monto opcional en soles: si no llega conserva el actual; null o vacío lo borra. */
+    private static BigDecimal optionalMoney(Map<String, Object> body, String key, BigDecimal current, String message) {
+        if (!body.containsKey(key)) return current;
+        Object value = body.get(key);
+        if (value == null || String.valueOf(value).isBlank()) return null;
+        BigDecimal amount;
+        try {
+            amount = new BigDecimal(String.valueOf(value).trim());
+        } catch (NumberFormatException ex) {
+            throw ApiException.badRequest(message);
+        }
+        if (amount.signum() < 0 || amount.compareTo(MAX_MONEY) > 0 || amount.stripTrailingZeros().scale() > 2) {
+            throw ApiException.badRequest(message);
+        }
+        return amount.setScale(2, RoundingMode.UNNECESSARY);
     }
 
     private static double number(Object value, double min, double max, String message, boolean integer) {

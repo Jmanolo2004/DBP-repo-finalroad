@@ -53,6 +53,17 @@ public class CardTransaction {
     @Column(length = 64)
     private String idempotencyKey;
 
+    /** Solo en DISCOUNT: la promoción aplicada (sin llave foránea: la promoción se puede borrar y el movimiento queda). */
+    @Column(name = "promotion_id")
+    private Long promotionId;
+
+    @Column(name = "promotion_name", length = 80)
+    private String promotionName;
+
+    /** Solo en REFERRAL_BONUS: el referido que lo generó. */
+    @Column(name = "referral_id")
+    private Long referralId;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;

@@ -29,6 +29,9 @@ public interface CardTransactionRepository extends JpaRepository<CardTransaction
     @EntityGraph(attributePaths = {"customer", "branch", "card", "card.program"})
     Optional<CardTransaction> findByIdAndBusinessId(Long id, Long businessId);
 
+    /** Todos los movimientos de un programa, incluidos los anulados. */
+    List<CardTransaction> findByCardProgramId(Long programId);
+
     Optional<CardTransaction> findByBusinessIdAndIdempotencyKey(Long businessId, String idempotencyKey);
 
     long countByCardIdAndTypeAndVoidedFalseAndCreatedAtAfter(Long cardId, com.fidegresa.model.TransactionType type, Instant after);

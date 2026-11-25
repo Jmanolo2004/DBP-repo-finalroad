@@ -120,6 +120,65 @@ class CoreApiTest {
     }
 
     @Test
+    void guardaCostoDelPremioYTicketPromedio() throws Exception {
+        String program = """
+                {"nombre":"Prueba de costos","tipo":"Estampillas","negocio":"Café de la Plaza","estado":"Borrador",
+                 "reglas":{"sellosMeta":8,"premio":"Un postre","iconoSello":"star","selloPor":"visita","montoMinimo":0,"limitePorDia":1},
+                 "rewardCost":4.5,"averageTicket":18}""";
+        String created = mvc.perform(post("/api/v1/loyalty-programs").header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content(program))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rewardCost").value(4.5))
+                .andExpect(jsonPath("$.averageTicket").value(18.0))
+                .andReturn().getResponse().getContentAsString();
+        String url = "/api/v1/loyalty-programs/" + json.readTree(created).get("id").asLong();
+
+        String copy = mvc.perform(post(url + "/duplicate").header("Authorization", bearer()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rewardCost").value(4.5))
+                .andReturn().getResponse().getContentAsString();
+        mvc.perform(delete("/api/v1/loyalty-programs/" + json.readTree(copy).get("id").asLong()).header("Authorization", bearer()))
+                .andExpect(status().isNoContent());
+
+        // Lo que no llega se conserva; null lo borra.
+        mvc.perform(put(url).header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON).content("{\"averageTicket\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rewardCost").value(4.5))
+                .andExpect(jsonPath("$.averageTicket").isEmpty());
+
+        for (String invalid : new String[]{"-1", "1.234", "\"abc\""}) {
+            mvc.perform(put(url).header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"rewardCost\":" + invalid + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(delete(url).header("Authorization", bearer())).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void eliminaUnProgramaConMovimientosAnulados() throws Exception {
+        String program = """
+                {"nombre":"Para eliminar","tipo":"Estampillas","negocio":"Café de la Plaza","estado":"Activa",
+                 "reglas":{"sellosMeta":8,"premio":"Un postre","iconoSello":"star","selloPor":"visita","montoMinimo":0,"limitePorDia":5}}""";
+        long programId = json.readTree(mvc.perform(post("/api/v1/loyalty-programs").header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content(program))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        String qrToken = json.readTree(mvc.perform(get("/api/v1/loyalty-programs/" + programId + "/customers").header("Authorization", bearer()))
+                .andReturn().getResponse().getContentAsString()).at("/content/0/qrToken").asText();
+        long cardId = json.readTree(mvc.perform(get("/api/v1/cards/qr/" + qrToken).header("Authorization", bearer()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(post("/api/v1/cards/" + cardId + "/stamps").header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"branchId\":1,\"quantity\":1}"))
+                .andExpect(status().isOk());
+        long transactionId = json.readTree(mvc.perform(get("/api/v1/cards/" + cardId + "/transactions").header("Authorization", bearer()))
+                .andReturn().getResponse().getContentAsString()).at("/content/0/id").asLong();
+        mvc.perform(delete("/api/v1/transactions/" + transactionId).header("Authorization", bearer())).andExpect(status().isNoContent());
+
+        mvc.perform(delete("/api/v1/loyalty-programs/" + programId).header("Authorization", bearer())).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/loyalty-programs/" + programId).header("Authorization", bearer())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/cards/qr/" + qrToken).header("Authorization", bearer())).andExpect(status().isNotFound());
+    }
+
+    @Test
     void respondeResenasYLimitaLocalesPorPlan() throws Exception {
         mvc.perform(patch("/api/v1/reviews/2/reply").header("Authorization", bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reply\":\"¡Gracias por tu visita!\"}"))

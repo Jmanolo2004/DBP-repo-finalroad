@@ -53,11 +53,23 @@ Ninguna contraseña ni clave queda escrita en el código.
 | Clientes | `GET /customers` (paginado, búsqueda, filtro, orden), `GET /customers/stats`, `GET /customers/{id}`, `POST /customers` |
 | Programas | `GET/POST /loyalty-programs`, `GET/PUT/DELETE /loyalty-programs/{id}`, `PATCH .../status`, `POST .../duplicate`, `GET .../customers` (paginado) |
 | Caja (app móvil) | `GET /cards/qr/{token}`, `POST /cards/{id}/stamps`, `/redemptions`, `/purchases`, `/balance-charges`, `PATCH /cards/{id}/status`, `GET /cards/{id}/transactions`, `GET /transactions`, `DELETE /transactions/{id}` |
-| Métricas | `GET /metrics`, `/metrics/overview`, `/metrics/activity`, `/metrics/cohorts`, `/metrics/insights`, `/metrics/export` |
+| Métricas | `GET /metrics`, `/metrics/overview`, `/metrics/activity`, `/metrics/cohorts`, `/metrics/insights`, `/metrics/export`, `/metrics/profitability` |
+| Reportes (solo administradores) | `GET /reports/transactions` (paginado), `GET /reports/transactions/export?format=csv\|xlsx`, `GET /reports/rewards` |
+| Webhooks (solo administradores) | `GET/POST/DELETE /webhooks`, `GET /webhooks/secret`, `POST /webhooks/test`, `GET /webhooks/deliveries` (paginado) |
 | Reseñas | `GET /reviews` (paginado), `GET /reviews/summary`, `PATCH /reviews/{id}/reply` |
 | Geolocalización | `GET /geo/customers`, `GET/PATCH /geo/settings`, `/audiences` (CRUD, vista previa, estado, prueba, duplicar) |
 | Equipo | `GET/POST /team`, `PUT/DELETE /team/{id}` |
 | Configuración | `GET/PATCH /settings`, `POST /settings/reset`, `GET /notices`, `POST /subscription/upgrade`, `DELETE /account` |
+
+### Webhooks
+
+El backend envía un POST JSON a la URL del negocio cuando ocurre `redemption.created`, `purchase.created` o `transaction.voided` (y `webhook.test` desde el panel). Cabeceras:
+
+- `X-Fidegresa-Signature`: `sha256=` + HMAC-SHA256 en hexadecimal del cuerpo exacto, con el secreto completo como clave.
+- `X-Fidegresa-Event`: nombre del evento.
+- `X-Fidegresa-Delivery`: identificador del evento; se repite en los reintentos para descartar duplicados.
+
+Una respuesta 2xx confirma la entrega. Si falla, se reintenta al minuto, a los 5 y a los 15 minutos.
 
 Cada negocio solo ve sus propios datos: todas las consultas se filtran por el negocio del usuario autenticado.
 

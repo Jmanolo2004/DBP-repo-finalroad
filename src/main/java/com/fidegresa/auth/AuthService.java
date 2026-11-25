@@ -40,10 +40,12 @@ public class AuthService {
     private final ApplicationEventPublisher events;
     private final Duration refreshLifetime;
     private final SecureRandom random = new SecureRandom();
+    private final com.fidegresa.referral.BusinessReferralService businessReferrals;
 
     public AuthService(AppUserRepository users, BusinessRepository businesses, BranchRepository branches,
                        RefreshTokenRepository refreshTokens, PasswordEncoder passwordEncoder, JwtUtils jwtUtils,
-                       ApplicationEventPublisher events, @Value("${app.jwt.refresh-days:14}") long refreshDays) {
+                       ApplicationEventPublisher events, @Value("${app.jwt.refresh-days:14}") long refreshDays,
+                       com.fidegresa.referral.BusinessReferralService businessReferrals) {
         this.users = users;
         this.businesses = businesses;
         this.branches = branches;
@@ -52,6 +54,7 @@ public class AuthService {
         this.jwtUtils = jwtUtils;
         this.events = events;
         this.refreshLifetime = Duration.ofDays(refreshDays);
+        this.businessReferrals = businessReferrals;
     }
 
     @Transactional
@@ -107,6 +110,7 @@ public class AuthService {
         user.setBusiness(business);
         users.save(user);
 
+        businessReferrals.registered(request.referralCode(), business);
         events.publishEvent(new UserRegisteredEvent(user.getEmail(), user.getFullName()));
         return issueSession(user, false);
     }

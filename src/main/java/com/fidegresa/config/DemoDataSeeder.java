@@ -151,12 +151,16 @@ public class DemoDataSeeder implements CommandLineRunner {
 
     private void createPrograms(Business business, List<Branch> locals) {
         String cover = "/covers/cafe-de-la-plaza.jpg";
-        program(business, locals.get(0), "Un café con cariño", "Estampillas", "Cada visita te acerca a una recompensa.", "#d9a514", "#a8650b", "elegante", cover, "Activa", 12,
+        LoyaltyProgram coffeeProgram = program(business, locals.get(0), "Un café con cariño","Estampillas", "Cada visita te acerca a una recompensa.", "#d9a514", "#a8650b", "elegante", cover, "Activa", 12,
                 "Una estampilla por visita. No acumulable con otras promociones.",
                 Map.of("sellosMeta", 10, "premio", "Un café gratis", "iconoSello", "star", "selloPor", "visita", "montoMinimo", 15, "limitePorDia", 1));
-        program(business, locals.get(1), "Dulce encuentro", "Estampillas", "Premiamos cada momento dulce.", "#f2b8c6", "#b2365f", "vibrante", null, "Activa", 6,
+        LoyaltyProgram dessertProgram = program(business, locals.get(1), "Dulce encuentro","Estampillas", "Premiamos cada momento dulce.", "#f2b8c6", "#b2365f", "vibrante", null, "Activa", 6,
                 "Válido para compras en Dulce Encuentro.",
                 Map.of("sellosMeta", 8, "premio", "Una porción de torta", "iconoSello", "reward", "selloPor", "compra mínima", "montoMinimo", 20, "limitePorDia", 2));
+        coffeeProgram.setRewardCost(new BigDecimal("4.50"));
+        coffeeProgram.setAverageTicket(new BigDecimal("18.00"));
+        dessertProgram.setRewardCost(new BigDecimal("6.50"));
+        dessertProgram.setAverageTicket(new BigDecimal("26.00"));
         program(business, locals.get(0), "Cashback de la Plaza", "Cashback", "Recibe saldo con cada compra.", "#0f4a32", "#9fd8b4", "minimal", cover, "Activa", 12,
                 "El saldo se acumula en la cuenta del cliente.",
                 Map.of("porcentaje", 5, "topeMensual", 100, "saldoMinimoCanje", 10, "expiraDias", 180));
@@ -183,7 +187,7 @@ public class DemoDataSeeder implements CommandLineRunner {
         return Map.of("nombre", name, "desdePuntos", points, "beneficio", benefit, "color", color);
     }
 
-    private void program(Business business, Branch branch, String name, String type, String description, String primary, String accent,
+    private LoyaltyProgram program(Business business, Branch branch, String name, String type, String description, String primary, String accent,
                          String style, String cover, String status, int months, String terms, Map<String, Object> rules) {
         LoyaltyProgram program = new LoyaltyProgram();
         program.setBusiness(business);
@@ -202,7 +206,7 @@ public class DemoDataSeeder implements CommandLineRunner {
         Instant created = atNoon(LocalDate.now(LIMA).minusDays(45));
         program.setCreatedAt(created);
         program.setUpdatedAt(created);
-        programs.save(program);
+        return programs.save(program);
     }
 
     /** Reparte las visitas del cliente en el tiempo (más los fines de semana, julio y diciembre). */

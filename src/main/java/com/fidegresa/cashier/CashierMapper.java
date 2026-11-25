@@ -5,6 +5,7 @@ import com.fidegresa.model.CardTransaction;
 import com.fidegresa.model.LoyaltyCard;
 import com.fidegresa.model.LoyaltyProgram;
 import com.fidegresa.model.TransactionType;
+import com.fidegresa.promotion.PromotionService;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -14,6 +15,26 @@ import java.util.List;
 /** Convierte tarjetas y movimientos al JSON que espera la app de caja. */
 @Component
 class CashierMapper {
+    private final PromotionService promotions;
+    private final CashierTransactionRepository transactions;
+
+    CashierMapper(PromotionService promotions, CashierTransactionRepository transactions) {
+        this.promotions = promotions;
+        this.transactions = transactions;
+    }
+
+    /** El display de la tarjeta; en cashback incluye su último movimiento de saldo. */
+    CardDisplay display(LoyaltyCard card) {
+        CardDisplay.LastMovement last = null;
+        if (ProgramRules.CASHBACK.equals(card.getProgram().getType()) && card.getId() != null) {
+            last = transactions.latestSoles(card.getId(), List.of(TransactionType.PURCHASE, TransactionType.BALANCE_CHARGE,
+                            TransactionType.REFERRAL_BONUS), org.springframework.data.domain.PageRequest.of(0, 1)).stream().findFirst()
+                    .map(t -> new CardDisplay.LastMovement(t.getType() == TransactionType.BALANCE_CHARGE ? t.getUnits().negate() : t.getUnits(),
+                            t.getCreatedAt()))
+                    .orElse(null);
+        }
+        return CardDisplay.of(card, last);
+    }
 
     CardDto toCard(LoyaltyCard card) {
         LoyaltyProgram program = card.getProgram();
@@ -24,7 +45,8 @@ class CashierMapper {
                 toProgram(program, rules, type),
                 new CustomerDto(card.getCustomer().getId(), card.getCustomer().getFullName(), card.getCustomer().getEmail()),
                 card.getStamps(), money(card.getCashbackBalance()), card.getPoints(), level,
-                money(card.getGiftBalance()), money(card.getGiftInitialAmount()), card.getExpiresAt());
+                money(card.getGiftBalance()), money(card.getGiftInitialAmount()), card.getExpiresAt(),
+                promotions.liveFor(card.getCustomer().getId(), program.getId()), display(card));
     }
 
     private ProgramDto toProgram(LoyaltyProgram program, ProgramRules rules, String type) {

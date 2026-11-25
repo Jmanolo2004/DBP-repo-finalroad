@@ -2,10 +2,13 @@ package com.fidegresa.cashier;
 
 import com.fidegresa.cashier.CashierDtos.*;
 import com.fidegresa.common.ApiException;
+import com.fidegresa.promotion.PromotionDtos;
+import com.fidegresa.promotion.PromotionService;
 import com.fidegresa.common.PageResponse;
 import com.fidegresa.model.*;
 import com.fidegresa.repository.BranchRepository;
 import com.fidegresa.security.CurrentUser;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +34,8 @@ public class CashierService {
     /** Ventana para anular un movimiento (la app muestra "Anular" solo mientras canBeVoided sea true). */
     static final Duration VOID_WINDOW = Duration.ofMinutes(10);
     static final List<TransactionType> CASHIER_TYPES =
-            List.of(TransactionType.STAMP, TransactionType.REDEMPTION, TransactionType.PURCHASE, TransactionType.BALANCE_CHARGE);
+            List.of(TransactionType.STAMP, TransactionType.REDEMPTION, TransactionType.PURCHASE, TransactionType.BALANCE_CHARGE,
+                    TransactionType.DISCOUNT);
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("99999.99");
     private static final int MAX_STAMPS_PER_OPERATION = 50;
     private static final Pattern TOKEN = Pattern.compile("^[A-Za-z0-9_-]{4,120}$");
@@ -42,14 +46,19 @@ public class CashierService {
     private final BranchRepository branches;
     private final CurrentUser currentUser;
     private final CashierMapper mapper;
+    private final ApplicationEventPublisher events;
+    private final PromotionService promotions;
 
     public CashierService(CashierCardRepository cards, CashierTransactionRepository transactions, BranchRepository branches,
-                          CurrentUser currentUser, CashierMapper mapper) {
+                          CurrentUser currentUser, CashierMapper mapper, ApplicationEventPublisher events,
+                          PromotionService promotions) {
         this.cards = cards;
         this.transactions = transactions;
         this.branches = branches;
         this.currentUser = currentUser;
         this.mapper = mapper;
+        this.events = events;
+        this.promotions = promotions;
     }
 
     // ------------------------------------------------------------------ lectura
@@ -211,6 +220,53 @@ public class CashierService {
         return mapper.toCard(card);
     }
 
+    /**
+     * Descuento de una promoción vigente para este cliente: porcentaje del monto o un monto fijo (nunca más que la compra).
+     * Una vez por día por tarjeta y promoción.
+     */
+    @Transactional
+    public DiscountDto discount(Long cardId, DiscountRequest request, String idempotencyKey) {
+        BigDecimal amount = validAmount(request == null ? null : request.amount());
+        if (request.promotionId() == null) throw ApiException.badRequest("Elige la promoción que vas a aplicar.");
+        Operation op = begin(cardId, idempotencyKey, TransactionType.DISCOUNT);
+        LoyaltyCard card = op.card();
+        if (op.replay()) {
+            CardTransaction previous = transactions.findByIdempotencyKey(currentUser.businessId(), op.key()).get(0);
+            return discountDto(previous, card);
+        }
+        PromotionDtos.CardPromotion promotion = promotions.liveFor(card.getCustomer().getId(), card.getProgram().getId()).stream()
+                .filter(p -> p.id().equals(request.promotionId())).findFirst()
+                .orElseThrow(() -> ApiException.unprocessable("Esta promoción no está vigente para este cliente."));
+        Branch branch = branch(request.branchId());
+        if (transactions.countDiscountsSince(card.getId(), promotion.id(), startOfToday()) > 0) {
+            throw ApiException.conflict("El cliente ya usó la promoción \"" + promotion.name() + "\" hoy.");
+        }
+        BigDecimal discount = "PERCENT".equals(promotion.discountType())
+                ? amount.multiply(promotion.discountValue()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                : promotion.discountValue().min(amount).setScale(2, RoundingMode.HALF_UP);
+        CardTransaction tx = record(op, branch, TransactionType.DISCOUNT, amount, discount, "SOLES", false,
+                t -> {
+                    t.setPromotionId(promotion.id());
+                    t.setPromotionName(promotion.name());
+                });
+        return discountDto(tx, card);
+    }
+
+    private DiscountDto discountDto(CardTransaction tx, LoyaltyCard card) {
+        BigDecimal purchase = CashierMapper.money(tx.getPurchaseAmount());
+        BigDecimal discount = CashierMapper.money(tx.getUnits());
+        return new DiscountDto(tx.getId(), tx.getPromotionId(), tx.getPromotionName(), purchase, discount, purchase.subtract(discount),
+                mapper.toCard(card));
+    }
+
+    /** El display de una tarjeta del negocio (lo mismo que trae la tarjeta al escanearla). */
+    @Transactional(readOnly = true)
+    public CardDisplay display(Long cardId) {
+        LoyaltyCard card = cards.findFullByIdAndBusinessId(cardId, currentUser.businessId())
+                .orElseThrow(() -> ApiException.notFound("Tarjeta no encontrada."));
+        return mapper.display(card);
+    }
+
     @Transactional
     public CardDto updateStatus(Long cardId, StatusRequest request) {
         String value = request == null || request.status() == null ? "" : request.status().trim().toUpperCase(Locale.ROOT);
@@ -222,6 +278,7 @@ public class CashierService {
         }
         LoyaltyCard card = lockCard(cardId);
         card.setStatus(status);
+        events.publishEvent(new WalletRefreshEvent(card.getId()));
         return mapper.toCard(card);
     }
 
@@ -246,6 +303,7 @@ public class CashierService {
         }
         revert(card, tx);
         tx.setVoided(true);
+        events.publishEvent(new CardMovementEvent(tx, true));
     }
 
     private void revert(LoyaltyCard card, CardTransaction tx) {
@@ -270,6 +328,9 @@ public class CashierService {
             case BALANCE_CHARGE -> {
                 if (ProgramRules.GIFT.equals(type)) card.setGiftBalance(CashierMapper.money(card.getGiftBalance()).add(units));
                 else card.setCashbackBalance(CashierMapper.money(card.getCashbackBalance()).add(units));
+            }
+            case DISCOUNT -> {
+                // El descuento no cambia la tarjeta: al anularlo solo deja de contar.
             }
             default -> throw ApiException.unprocessable("Este movimiento no se puede anular.");
         }
@@ -341,6 +402,12 @@ public class CashierService {
 
     private void record(Operation op, Branch branch, TransactionType type, BigDecimal purchaseAmount, BigDecimal units, String unit,
                         boolean rewardRedeemed) {
+        record(op, branch, type, purchaseAmount, units, unit, rewardRedeemed, tx -> {
+        });
+    }
+
+    private CardTransaction record(Operation op, Branch branch, TransactionType type, BigDecimal purchaseAmount, BigDecimal units,
+                                   String unit, boolean rewardRedeemed, java.util.function.Consumer<CardTransaction> extra) {
         LoyaltyCard card = op.card();
         AppUser user = currentUser.get();
         CardTransaction tx = new CardTransaction();
@@ -356,7 +423,10 @@ public class CashierService {
         tx.setCard(card);
         tx.setPerformedBy(user);
         tx.setBusiness(user.getBusiness());
+        extra.accept(tx);
         transactions.save(tx);
+        events.publishEvent(new CardMovementEvent(tx, false));
+        return tx;
     }
 
     private static BigDecimal validAmount(BigDecimal amount) {

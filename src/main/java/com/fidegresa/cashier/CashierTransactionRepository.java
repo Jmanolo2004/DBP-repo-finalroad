@@ -43,6 +43,17 @@ interface CashierTransactionRepository extends JpaRepository<CardTransaction, Lo
             + "and t.voided = false and t.createdAt >= :since")
     BigDecimal sumUnitsSince(@Param("cardId") Long cardId, @Param("type") TransactionType type, @Param("since") Instant since);
 
+    /** Movimientos de saldo en soles más recientes de una tarjeta (para "Último movimiento" de cashback). */
+    @Query("select t from CardTransaction t where t.card.id = :cardId and t.voided = false and t.unit = 'SOLES' and t.type in :types "
+            + "order by t.createdAt desc, t.id desc")
+    List<CardTransaction> latestSoles(@Param("cardId") Long cardId, @Param("types") List<TransactionType> types,
+                                      org.springframework.data.domain.Pageable pageable);
+
+    /** Descuentos vigentes de una promoción en esta tarjeta desde una fecha. */
+    @Query("select count(t) from CardTransaction t where t.card.id = :cardId and t.type = com.fidegresa.model.TransactionType.DISCOUNT "
+            + "and t.promotionId = :promotionId and t.voided = false and t.createdAt >= :since")
+    long countDiscountsSince(@Param("cardId") Long cardId, @Param("promotionId") Long promotionId, @Param("since") Instant since);
+
     /** Último movimiento vigente (id más alto) de cada tarjeta: solo ese se puede anular. */
     @Query("select t.card.id, max(t.id) from CardTransaction t where t.card.id in :cardIds and t.voided = false "
             + "and t.type in :types group by t.card.id")

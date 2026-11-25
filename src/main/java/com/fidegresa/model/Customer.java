@@ -55,6 +55,28 @@ public class Customer {
     @Column(nullable = false)
     private Instant registeredAt = Instant.now();
 
+    /** Cuándo aceptó el tratamiento de sus datos (Ley 29733) y qué versión del texto. Null en clientes antiguos. */
+    private Instant consentAt;
+
+    @Column(length = 20)
+    private String consentVersion;
+
+    /** Dónde se registró: MENU_QR (menú público). Null = desde el panel o antes de existir este dato. */
+    @Column(length = 20)
+    private String signupSource;
+
+    /** Se dio de baja de los correos (null = los recibe si dio su consentimiento). */
+    @Column(name = "email_opt_out_at")
+    private Instant emailOptOutAt;
+
+    /** Token secreto del enlace "darse de baja" de sus correos; se crea con el primer correo. */
+    @Column(name = "email_token", length = 43, unique = true)
+    private String emailToken;
+
+    /** Código para invitar amigos (ej. LUCIA23), único en toda la plataforma; se crea al unirse o con su primer uso. */
+    @Column(name = "referral_code", length = 20, unique = true)
+    private String referralCode;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;

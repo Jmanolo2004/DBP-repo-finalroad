@@ -46,6 +46,10 @@ public class LoyaltyCard {
 
     private Instant expiresAt;
 
+    /** Id del pase en Google Wallet ({issuerId}.fdg_card_{id}), una vez que se emitió. Null si nunca se agregó. */
+    @Column(name = "wallet_object_id", length = 120)
+    private String walletObjectId;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 

@@ -32,7 +32,11 @@ public class BusinessData {
         this.cardEntities = cards;
         Instant now = Instant.now();
 
+        // Los descuentos de promociones y los premios por referido acompañan una compra que ya está registrada:
+        // no son otra visita ni otra venta.
         this.visitas = transactions.stream()
+                .filter(tx -> tx.getType() != com.fidegresa.model.TransactionType.DISCOUNT
+                        && tx.getType() != com.fidegresa.model.TransactionType.REFERRAL_BONUS)
                 .sorted(Comparator.comparing(CardTransaction::getCreatedAt))
                 .map(tx -> new Views.VisitView(String.valueOf(tx.getId()), tx.getCustomer().getId(), tx.getBranch().getId(),
                         tx.getCreatedAt(), tx.getPurchaseAmount().doubleValue(), tx.isRewardRedeemed(), tx.getType().name(),

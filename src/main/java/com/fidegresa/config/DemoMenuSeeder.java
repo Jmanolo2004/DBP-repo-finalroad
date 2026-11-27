@@ -21,13 +21,14 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.util.Map;
@@ -54,13 +55,14 @@ public class DemoMenuSeeder implements CommandLineRunner {
     private final ProductService productService;
     private final CatalogService catalogService;
     private final ObjectMapper mapper;
+    private final TransactionTemplate tx;
 
     public DemoMenuSeeder(@Value("${app.seed.enabled:true}") boolean seedEnabled,
                           @Value("${app.seed.menu:true}") boolean menuEnabled,
                           @Value("${app.seed.email}") String email,
                           AppUserRepository users, BranchRepository branches, BranchCatalogRepository catalogs,
                           MenuProductRepository products, ProductService productService, CatalogService catalogService,
-                          ObjectMapper mapper) {
+                          ObjectMapper mapper, TransactionTemplate tx) {
         this.enabled = seedEnabled && menuEnabled;
         this.email = email;
         this.users = users;
@@ -70,17 +72,27 @@ public class DemoMenuSeeder implements CommandLineRunner {
         this.productService = productService;
         this.catalogService = catalogService;
         this.mapper = mapper;
+        this.tx = tx;
     }
 
+    /**
+     * Si algo falla (por ejemplo, el almacenamiento de archivos no responde), se deshace todo
+     * y el backend arranca igual: la carta de demostración no debe impedir que la app inicie.
+     */
     @Override
-    @Transactional
     public void run(String... args) {
         if (!enabled) return;
-        Business business = users.findByEmailIgnoreCase(email).map(AppUser::getBusiness).orElse(null);
-        if (business == null || products.existsByBusinessId(business.getId())) return;
         try {
-            seed(business);
-        } catch (IOException e) {
+            tx.executeWithoutResult(status -> {
+                Business business = users.findByEmailIgnoreCase(email).map(AppUser::getBusiness).orElse(null);
+                if (business == null || products.existsByBusinessId(business.getId())) return;
+                try {
+                    seed(business);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (RuntimeException e) {
             log.warn("No se pudo cargar la carta de demostración: {}", e.getMessage());
         }
     }

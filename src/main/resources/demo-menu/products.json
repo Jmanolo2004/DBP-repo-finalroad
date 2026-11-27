@@ -1,0 +1,61 @@
+[
+  {
+    "branch": "Café de la Plaza",
+    "slug": "cafe-de-la-plaza",
+    "colors": ["#d9a514", "#a8650b"],
+    "products": [
+      {"slug": "espresso-doble", "emoji": "☕", "name": "Espresso doble", "description": "Dos shots de café de altura de Chanchamayo, intenso y aromático.", "price": "8.00", "inStock": true},
+      {"slug": "latte-vainilla", "emoji": "🥛", "name": "Latte de vainilla", "description": "Espresso con leche vaporizada y un toque de vainilla natural.", "price": "12.50", "inStock": true},
+      {"slug": "croissant", "emoji": "🥐", "name": "Croissant de mantequilla", "description": "Hojaldrado y dorado, horneado cada mañana en el local.", "price": "9.50", "inStock": true},
+      {"slug": "sanguche-pavo", "emoji": "🥪", "name": "Sánguche de pavo", "description": "Pavo horneado, lechuga, tomate y mayonesa de la casa en pan ciabatta.", "price": "18.00", "inStock": true},
+      {"slug": "cheesecake-maracuya", "emoji": "🍰", "name": "Cheesecake de maracuyá", "description": "Cremoso, con base de galleta y coulis de maracuyá.", "price": "14.00", "inStock": false}
+    ]
+  },
+  {
+    "branch": "Dulce Encuentro",
+    "slug": "dulce-encuentro",
+    "colors": ["#f2b8c6", "#b2365f"],
+    "products": [
+      {"slug": "torta-chocolate", "emoji": "🎂", "name": "Torta de chocolate", "description": "Porción de bizcocho húmedo con fudge de chocolate al 70 %.", "price": "15.00", "inStock": true},
+      {"slug": "alfajores", "emoji": "🍪", "name": "Alfajores de manjar (x3)", "description": "Masa suave que se deshace, rellenos de manjar blanco.", "price": "12.00", "inStock": true},
+      {"slug": "pie-limon", "emoji": "🥧", "name": "Pie de limón", "description": "Crema de limón ácida y merengue italiano gratinado.", "price": "13.00", "inStock": true},
+      {"slug": "cupcake-red-velvet", "emoji": "🧁", "name": "Cupcake red velvet", "description": "Con frosting de queso crema y chispas de colores.", "price": "9.00", "inStock": false},
+      {"slug": "tres-leches", "emoji": "🍮", "name": "Tres leches", "description": "Bizcocho bañado en tres leches con canela.", "price": "14.00", "inStock": true}
+    ]
+  },
+  {
+    "branch": "Barbería Norte",
+    "slug": "barberia-norte",
+    "colors": ["#1b2230", "#e0b45a"],
+    "products": [
+      {"slug": "corte-clasico", "emoji": "✂️", "name": "Corte clásico", "description": "Corte a tijera o máquina, lavado y peinado.", "price": "35.00", "inStock": true},
+      {"slug": "corte-barba", "emoji": "💈", "name": "Corte + barba", "description": "Corte completo y arreglo de barba con navaja.", "price": "55.00", "inStock": true},
+      {"slug": "perfilado-barba", "emoji": "🧔", "name": "Perfilado de barba", "description": "Diseño y perfilado con aceite hidratante.", "price": "25.00", "inStock": true},
+      {"slug": "afeitado-toalla", "emoji": "🪒", "name": "Afeitado con toalla caliente", "description": "Afeitado tradicional con toalla caliente y bálsamo.", "price": "40.00", "inStock": true}
+    ]
+  },
+  {
+    "branch": "La Mesa Alegre",
+    "slug": "la-mesa-alegre",
+    "colors": ["#c2410c", "#fbbf24"],
+    "products": [
+      {"slug": "lomo-saltado", "emoji": "🥩", "name": "Lomo saltado", "description": "Lomo fino al wok con cebolla, tomate, papas fritas y arroz.", "price": "42.00", "inStock": true},
+      {"slug": "ceviche", "emoji": "🐟", "name": "Ceviche clásico", "description": "Pesca del día en leche de tigre, camote y choclo.", "price": "38.00", "inStock": true},
+      {"slug": "aji-gallina", "emoji": "🍛", "name": "Ají de gallina", "description": "Crema de ají amarillo con pollo deshilachado y arroz.", "price": "32.00", "inStock": true},
+      {"slug": "chicha-morada", "emoji": "🍇", "name": "Chicha morada (jarra)", "description": "Hecha en casa con maíz morado, piña y canela.", "price": "18.00", "inStock": true},
+      {"slug": "suspiro-limeno", "emoji": "🍮", "name": "Suspiro limeño", "description": "Manjar blanco con merengue al oporto.", "price": "14.00", "inStock": false}
+    ]
+  },
+  {
+    "branch": "Confitería Nube",
+    "slug": "confiteria-nube",
+    "colors": ["#2f67ad", "#ffd166"],
+    "products": [
+      {"slug": "bombones", "emoji": "🍫", "name": "Bombones artesanales (x9)", "description": "Chocolate peruano relleno de lúcuma, maracuyá y café.", "price": "28.00", "inStock": true},
+      {"slug": "chocotejas", "emoji": "🍬", "name": "Chocotejas de pecana (x4)", "description": "Rellenas de manjar y pecanas, bañadas en chocolate.", "price": "16.00", "inStock": true},
+      {"slug": "galletas-mantequilla", "emoji": "🍪", "name": "Galletas de mantequilla", "description": "Bolsa de 200 g, crocantes y recién horneadas.", "price": "12.00", "inStock": true},
+      {"slug": "donut-glaseado", "emoji": "🍩", "name": "Donut glaseado", "description": "Esponjoso, con glaseado de vainilla y chispas.", "price": "7.00", "inStock": true},
+      {"slug": "marshmallows", "emoji": "☁️", "name": "Marshmallows caseros", "description": "Suaves como una nube, de vainilla y fresa.", "price": "10.00", "inStock": false}
+    ]
+  }
+]

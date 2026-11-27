@@ -78,6 +78,8 @@ public class AccountController {
         entityManager.createQuery("delete from MenuDailyStat s where s.business.id = :id").setParameter("id", businessId).executeUpdate();
         // La invitación apunta a un programa y a una imagen: se borra antes que ellos.
         entityManager.createQuery("delete from BranchInvitation i where i.business.id = :id").setParameter("id", businessId).executeUpdate();
+        // Los productos apuntan a su foto: se borran antes que los archivos.
+        entityManager.createQuery("delete from MenuProduct p where p.business.id = :id").setParameter("id", businessId).executeUpdate();
         // Los catálogos apuntan a los archivos: se borran antes que ellos.
         entityManager.createQuery("delete from CatalogFile f where f.catalog.id in (select c.id from BranchCatalog c where c.business.id = :id)")
                 .setParameter("id", businessId).executeUpdate();

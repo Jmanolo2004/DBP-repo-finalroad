@@ -2,6 +2,8 @@ package com.fidegresa.metrics;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fidegresa.repository.AppUserRepository;
+import com.fidegresa.repository.CustomerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,10 @@ class MetricsControllerTest {
     private MockMvc mvc;
     @Autowired
     private ObjectMapper mapper;
+    @Autowired
+    private AppUserRepository users;
+    @Autowired
+    private CustomerRepository customers;
     private String token;
 
     @BeforeEach
@@ -53,7 +59,7 @@ class MetricsControllerTest {
                 .andExpect(jsonPath("$.topLocations.length()").value(5))
                 .andExpect(jsonPath("$.recentActivity").isArray())
                 .andExpect(jsonPath("$.recentCustomers.length()").value(4))
-                .andExpect(jsonPath("$.totalCustomers").value(30))
+                .andExpect(jsonPath("$.totalCustomers").value(customerCount()))
                 .andExpect(jsonPath("$.suggestions").isArray());
         // Sin parámetros usa el mes actual y las ventas
         mvc.perform(get("/api/v1/metrics").header("Authorization", token))
@@ -117,7 +123,7 @@ class MetricsControllerTest {
 
         mvc.perform(get("/api/v1/metrics/activity").header("Authorization", token).param("type", "Se registró"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(30));
+                .andExpect(jsonPath("$.totalElements").value(customerCount()));
     }
 
     @Test
@@ -134,5 +140,16 @@ class MetricsControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.filename").value("fidegresa-actividad.csv"))
                 .andExpect(jsonPath("$.content").isString());
+    }
+
+    /**
+     * Clientes del negocio de demostración: 30 sembrados más los que agregan otras pruebas que comparten esta base
+     * (por ejemplo, el registro de clientes). Así el resultado no depende del orden en que corren las pruebas.
+     */
+    private int customerCount() {
+        Long businessId = users.findByEmailIgnoreCase("maria@fidegresa.com").orElseThrow().getBusiness().getId();
+        int count = customers.findByBusinessId(businessId).size();
+        assertThat(count).isGreaterThanOrEqualTo(30);
+        return count;
     }
 }

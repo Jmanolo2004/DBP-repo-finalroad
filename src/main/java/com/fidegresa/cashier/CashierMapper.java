@@ -84,12 +84,13 @@ class CashierMapper {
                 card == null ? null : card.getQrToken(), canBeVoided);
     }
 
-    /** El modelo guarda PURCHASE/BALANCE_CHARGE; la app distingue si fue cashback, puntos o gift card. */
+    /** El modelo guarda PURCHASE/BALANCE_CHARGE; la app distingue si fue cashback, puntos o gift card (recarga o cobro). */
     static String appType(TransactionType type, LoyaltyProgram program) {
         String programType = program == null ? "" : program.getType();
         return switch (type) {
             case PURCHASE -> ProgramRules.CASHBACK.equals(programType) ? "CASHBACK_EARNED"
-                    : ProgramRules.LEVELS.equals(programType) ? "POINTS_EARNED" : "PURCHASE";
+                    : ProgramRules.LEVELS.equals(programType) ? "POINTS_EARNED"
+                    : ProgramRules.GIFT.equals(programType) ? "GIFT_LOAD" : "PURCHASE";
             case BALANCE_CHARGE -> ProgramRules.CASHBACK.equals(programType) ? "CASHBACK_USED"
                     : ProgramRules.GIFT.equals(programType) ? "GIFT_CHARGE" : "BALANCE_CHARGE";
             default -> type.name();

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Correos automáticos: Bienvenida (al unirse), Premio cerca (después de un movimiento en caja), Te extrañamos
@@ -39,6 +40,9 @@ public class EmailAutomationService {
 
     public record Default(String label, String description, String subject, String body, String benefit) {
     }
+
+    /** Correos activos aunque el negocio todavía no los haya configurado. */
+    static final Set<String> ON_BY_DEFAULT = Set.of("WELCOME");
 
     /** Textos por defecto, en el orden en que se muestran. Admiten {{nombre}} y {{negocio}}. */
     static final Map<String, Default> DEFAULTS = new LinkedHashMap<>();
@@ -207,7 +211,8 @@ public class EmailAutomationService {
         for (EmailAutomation automation : readOnly.execute(status -> automations.findByTypeAndEnabledTrue("BIRTHDAY"))) {
             Long businessId = readOnly.execute(status -> em.find(EmailAutomation.class, automation.getId()).getBusiness().getId());
             List<Long> ids = readOnly.execute(status -> em.createQuery("select c.id from Customer c where c.business.id = :b and c.birthday = :day"
-                    + " and c.consentAt is not null and c.emailOptOutAt is null", Long.class)
+                    + " and c.consentAt is not null and c.emailOptOutAt is null"
+                    + " and (c.marketingConsent is null or c.marketingConsent = true)", Long.class)
                     .setParameter("b", businessId).setParameter("day", todayKey).getResultList());
             for (Long customerId : ids) {
                 if (!"SKIPPED".equals(mailer.send(customerId, message("BIRTHDAY", String.valueOf(today.getYear()), automation)))) attempted++;
@@ -221,13 +226,29 @@ public class EmailAutomationService {
                 List.of(), null, null);
     }
 
+    /**
+     * La configuración del negocio si está activa. La bienvenida viene activa por defecto (el cliente espera ese correo
+     * al registrarse): si el negocio nunca la configuró, se usan los textos por defecto. El resto se activa desde el panel.
+     */
     private EmailAutomation enabled(Long businessId, String type) {
-        return automations.findByBusinessIdAndType(businessId, type).filter(EmailAutomation::isEnabled).orElse(null);
+        Optional<EmailAutomation> saved = automations.findByBusinessIdAndType(businessId, type);
+        if (saved.isPresent()) return saved.get().isEnabled() ? saved.get() : null;
+        if (!ON_BY_DEFAULT.contains(type)) return null;
+        Default d = DEFAULTS.get(type);
+        EmailAutomation defaults = new EmailAutomation(); // sin guardar: solo sus textos
+        defaults.setType(type);
+        defaults.setSubject(d.subject());
+        defaults.setBody(d.body());
+        defaults.setBenefit(d.benefit());
+        defaults.setEnabled(true);
+        return defaults;
     }
 
     private AutomationDto toDto(String type, EmailAutomation automation) {
         Default d = DEFAULTS.get(type);
-        if (automation == null) return new AutomationDto(type, d.label(), d.description(), false, d.subject(), d.body(), d.benefit(), null);
+        if (automation == null) {
+            return new AutomationDto(type, d.label(), d.description(), ON_BY_DEFAULT.contains(type), d.subject(), d.body(), d.benefit(), null);
+        }
         return new AutomationDto(type, d.label(), d.description(), automation.isEnabled(), automation.getSubject(), automation.getBody(),
                 automation.getBenefit(), automation.getUpdatedAt());
     }

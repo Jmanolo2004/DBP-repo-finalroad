@@ -272,6 +272,48 @@ class GoogleWalletTest {
         for (Long id : ids) mvc.perform(delete("/api/v1/promotions/" + id).header("Authorization", token)).andExpect(status().isNoContent());
     }
 
+    @Test
+    void elGeopushLlegaAlPaseDeQuienesGuardaronSuTarjeta() throws Exception {
+        // Un cliente elegible de la audiencia guarda su tarjeta en Google Wallet; luego se activa la audiencia.
+        JsonNode preview = read(post("/api/v1/audiences/preview").contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of("branchId", branchId, "radius", 3000, "zoneType", "radius",
+                        "activity", "todos", "cardType", "Todas"))), token);
+        long customerId = preview.at("/clientes/0/id").asLong();
+        LoyaltyCard card = tx.execute(status -> cards.findByCustomerId(customerId).stream()
+                .filter(c -> c.getProgram().getBusiness().getId().equals(businessId)).findFirst().orElseThrow());
+        read(post("/api/v1/cards/" + card.getId() + "/google-wallet"), token);
+        String objectId = ISSUER + "." + card.getQrToken();
+        String firstName = inTx(c -> c.getCustomer().getFullName(), card.getId()).split(" ")[0];
+
+        CALLS.clear();
+        Map<String, Object> audience = new java.util.LinkedHashMap<>();
+        audience.put("nombre", "Combo de la tarde");
+        audience.put("branchId", branchId);
+        audience.put("radius", 3000);
+        audience.put("zoneType", "radius");
+        audience.put("filters", Map.of("activity", "todos", "cardType", "Todas"));
+        audience.put("message", Map.of("title", "{nombre}, tenemos un regalo", "text", "Pasa por {local} y llévate un 20 % de descuento."));
+        audience.put("trigger", "geofence");
+        audience.put("estado", "Activa");
+        JsonNode created = read(post("/api/v1/audiences").contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(audience)), token);
+
+        Predicate<Call> isMessage = c -> c.path().endsWith("/genericObject/" + objectId + "/addMessage");
+        for (int i = 0; i < 100 && CALLS.stream().noneMatch(isMessage); i++) Thread.sleep(50);
+        JsonNode message = mapper.readTree(CALLS.stream().filter(isMessage).findFirst().orElseThrow().body()).get("message");
+        assertThat(message.get("header").asText()).isEqualTo(firstName + ", tenemos un regalo");
+        assertThat(message.get("body").asText()).isEqualTo("Pasa por " + created.get("local").asText() + " y llévate un 20 % de descuento.");
+        assertThat(message.get("messageType").asText()).isEqualTo("TEXT_AND_NOTIFY");
+        assertThat(message.get("id").asText()).startsWith("geo-" + created.get("id").asLong() + "-");
+
+        // Pausar no envía nada; volver a activarla es un envío nuevo (otro mensaje), nunca el mismo dos veces.
+        CALLS.clear();
+        String audienceUrl = "/api/v1/audiences/" + created.get("id").asLong() + "/status";
+        read(patch(audienceUrl).contentType(MediaType.APPLICATION_JSON).content("{\"estado\":\"Pausada\"}"), token);
+        Thread.sleep(300);
+        assertThat(CALLS).noneMatch(isMessage);
+        mvc.perform(delete("/api/v1/audiences/" + created.get("id").asLong()).header("Authorization", token)).andExpect(status().is2xxSuccessful());
+    }
+
     // ---------- servidor falso de Google ----------
 
     static void handle(HttpExchange exchange) throws IOException {

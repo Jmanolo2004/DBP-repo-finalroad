@@ -116,17 +116,21 @@ class ReportControllerTest {
                 {"nombre":"Sellos; Ñandú","tipo":"Estampillas","negocio":"Heladería Ñandú","estado":"Activa",
                  "reglas":{"sellosMeta":4,"premio":"Café gratis","iconoSello":"star","selloPor":"visita","montoMinimo":0,"limitePorDia":20},
                  "rewardCost":4.5}""", token).get("id").asLong();
+        // Otro programa del local (antes de registrar al cliente: así recibe las dos tarjetas).
+        read(post("/api/v1/loyalty-programs"), """
+                {"nombre":"Otros sellos","tipo":"Estampillas","negocio":"Heladería Ñandú","estado":"Activa",
+                 "reglas":{"sellosMeta":4,"premio":"Torta","iconoSello":"star","selloPor":"visita","montoMinimo":0,"limitePorDia":20}}""", token);
         // Un nombre que parece fórmula no debe ejecutarse al abrir el archivo.
         long customerId = read(post("/api/v1/customers"),
                 "{\"fullName\":\"=HYPERLINK(1)\",\"email\":\"formula@correo.pe\",\"phone\":\"999 111 444\",\"localId\":" + branchId + "}", token).get("id").asLong();
-        String qrToken = read(get("/api/v1/customers/" + customerId), token).at("/tarjetas/0/qrToken").asText();
+        String qrToken = "";
+        for (JsonNode card : read(get("/api/v1/customers/" + customerId), token).get("tarjetas")) {
+            if (card.get("programaId").asLong() == programId) qrToken = card.get("qrToken").asText();
+        }
         long cardId = read(get("/api/v1/cards/qr/" + qrToken), token).get("id").asLong();
         read(post("/api/v1/cards/" + cardId + "/stamps"), "{\"branchId\":" + branchId + ",\"quantity\":4,\"amount\":12.5}", token);
         read(post("/api/v1/cards/" + cardId + "/redemptions"), "{\"branchId\":" + branchId + "}", token);
         // Un movimiento anulado (en otro programa) no aparece.
-        read(post("/api/v1/loyalty-programs"), """
-                {"nombre":"Otros sellos","tipo":"Estampillas","negocio":"Heladería Ñandú","estado":"Activa",
-                 "reglas":{"sellosMeta":4,"premio":"Torta","iconoSello":"star","selloPor":"visita","montoMinimo":0,"limitePorDia":20}}""", token);
         String otherToken = "";
         for (JsonNode card : read(get("/api/v1/customers/" + customerId), token).get("tarjetas")) {
             if (!qrToken.equals(card.get("qrToken").asText())) otherToken = card.get("qrToken").asText();

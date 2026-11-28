@@ -67,7 +67,9 @@ public class CustomerSegments {
         if (programId != null) {
             jpql.append(" and exists (select k.id from LoyaltyCard k where k.customer = c and k.program.id = :programId)");
         }
-        if (emailable) jpql.append(" and c.consentAt is not null and c.emailOptOutAt is null");
+        if (emailable) {
+            jpql.append(" and c.consentAt is not null and c.emailOptOutAt is null and (c.marketingConsent is null or c.marketingConsent = true)");
+        }
         switch (segment) {
             case ALL -> {
             }

@@ -34,6 +34,14 @@ public class Customer {
     @Column(length = 5)
     private String birthday;
 
+    /** Fecha de nacimiento completa (formulario de la tarjeta). Opcional; birthday guarda el dd/MM. */
+    @Column(name = "birth_date")
+    private java.time.LocalDate birthDate;
+
+    /** Aceptó promociones por correo y Google Wallet. Null = clientes anteriores (se mantienen como antes). */
+    @Column(name = "marketing_consent")
+    private Boolean marketingConsent;
+
     @Column(nullable = false)
     private double latitude;
 

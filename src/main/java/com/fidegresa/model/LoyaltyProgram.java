@@ -77,6 +77,10 @@ public class LoyaltyProgram {
     @Column(precision = 10, scale = 2)
     private BigDecimal averageTicket;
 
+    /** Código público del formulario de registro (QR del detalle). Null hasta que el panel pide el enlace. */
+    @Column(name = "join_code", length = 12, unique = true)
+    private String joinCode;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 

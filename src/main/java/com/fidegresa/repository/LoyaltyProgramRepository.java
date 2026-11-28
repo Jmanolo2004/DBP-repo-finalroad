@@ -15,4 +15,9 @@ public interface LoyaltyProgramRepository extends JpaRepository<LoyaltyProgram, 
     Optional<LoyaltyProgram> findByIdAndBusinessId(Long id, Long businessId);
 
     List<LoyaltyProgram> findByBranchIdAndStatus(Long branchId, String status);
+
+    @EntityGraph(attributePaths = {"branch", "business"})
+    Optional<LoyaltyProgram> findByJoinCode(String joinCode);
+
+    boolean existsByJoinCode(String joinCode);
 }

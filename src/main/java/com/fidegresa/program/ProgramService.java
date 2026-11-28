@@ -21,7 +21,7 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.regex.Pattern;
 
-/** Programas (tarjetas) del negocio: reglas por tipo, métricas reales y emisión de tarjetas a clientes. */
+/** Programas (tarjetas) del negocio: reglas por tipo y métricas reales de las tarjetas emitidas. */
 @Service
 public class ProgramService {
     private static final List<String> TYPES = List.of("Estampillas", "Cashback", "Niveles", "Giftcard");
@@ -32,11 +32,9 @@ public class ProgramService {
 
     private final LoyaltyProgramRepository programs;
     private final BranchRepository branches;
-    private final CustomerRepository customers;
     private final LoyaltyCardRepository cards;
     private final CardTransactionRepository transactions;
     private final BusinessDataLoader loader;
-    private final CardIssuer cardIssuer;
     private final BranchInvitationRepository invitations;
     private final PromotionService promotions;
     private final ReferralService referrals;
@@ -44,18 +42,16 @@ public class ProgramService {
     private static final BigDecimal MAX_MONEY = new BigDecimal("99999.99");
 
 
-    public ProgramService(LoyaltyProgramRepository programs, BranchRepository branches, CustomerRepository customers,
+    public ProgramService(LoyaltyProgramRepository programs, BranchRepository branches,
                           LoyaltyCardRepository cards, CardTransactionRepository transactions, BusinessDataLoader loader,
-                          CardIssuer cardIssuer, BranchInvitationRepository invitations,
+                          BranchInvitationRepository invitations,
                           PromotionService promotions, @org.springframework.context.annotation.Lazy ReferralService referrals,
                           BusinessReferralService businessReferrals) {
         this.programs = programs;
         this.branches = branches;
-        this.customers = customers;
         this.cards = cards;
         this.transactions = transactions;
         this.loader = loader;
-        this.cardIssuer = cardIssuer;
         this.invitations = invitations;
         this.promotions = promotions;
         this.referrals = referrals;
@@ -115,8 +111,7 @@ public class ProgramService {
         LoyaltyProgram program = new LoyaltyProgram();
         program.setBusiness(business);
         apply(program, business, body, true);
-        programs.save(program);
-        issueIfActive(program);
+        programs.save(program); // empieza en 0: las tarjetas se emiten cuando cada cliente se registra
         businessReferrals.programCreated(business.getId()); // si llegó recomendado, ya es "convertido"
         return detail(business, program.getId());
     }
@@ -125,7 +120,6 @@ public class ProgramService {
     public Map<String, Object> update(Business business, Long id, Map<String, Object> body) {
         LoyaltyProgram program = findOwned(business, id);
         apply(program, business, body, false);
-        issueIfActive(program);
         return detail(business, id);
     }
 
@@ -135,7 +129,6 @@ public class ProgramService {
         if (!(status instanceof String value) || !STATUSES.contains(value)) throw ApiException.badRequest("El estado de la tarjeta no es válido.");
         program.setStatus(value);
         program.setUpdatedAt(Instant.now());
-        issueIfActive(program);
         return detail(business, id);
     }
 
@@ -177,15 +170,6 @@ public class ProgramService {
         programs.delete(program);
     }
 
-    private void issueIfActive(LoyaltyProgram program) {
-        if (!"Activa".equals(program.getStatus())) return;
-        programs.flush();
-        customers.findByBusinessId(program.getBusiness().getId()).stream()
-                .filter(customer -> customer.getBranch().getId().equals(program.getBranch().getId()))
-                .filter(customer -> !cards.existsByCustomerIdAndProgramId(customer.getId(), program.getId()))
-                .forEach(customer -> cards.save(cardIssuer.newCard(customer, program)));
-    }
-
     private LoyaltyProgram findOwned(Business business, Long id) {
         return programs.findByIdAndBusinessId(id, business.getId()).orElseThrow(() -> ApiException.notFound("No encontramos esta tarjeta."));
     }
@@ -195,9 +179,12 @@ public class ProgramService {
                 .orElseThrow(() -> ApiException.notFound("No encontramos esta tarjeta."));
     }
 
+    /** Clientes del programa: quienes tienen su tarjeta (una tarjeta nueva no tiene ninguno). */
     private static List<Views.CustomerView> clientsFor(BusinessData data, LoyaltyProgram program) {
-        Long branchId = program.getBranch().getId();
-        return data.clientes.stream().filter(customer -> customer.localId().equals(branchId)).toList();
+        Set<Long> holders = new HashSet<>();
+        data.cardEntities.stream().filter(card -> card.getProgram().getId().equals(program.getId()))
+                .forEach(card -> holders.add(card.getCustomer().getId()));
+        return data.clientes.stream().filter(customer -> holders.contains(customer.id())).toList();
     }
 
     private static String progressLabel(LoyaltyProgram program, LoyaltyCard card) {
@@ -218,7 +205,9 @@ public class ProgramService {
         List<Views.CustomerView> clients = clientsFor(data, program);
         Set<Long> clientIds = new HashSet<>();
         clients.forEach(customer -> clientIds.add(customer.id()));
-        List<Views.VisitView> visits = data.visitas.stream().filter(visit -> clientIds.contains(visit.clienteId())).toList();
+        // Solo los movimientos hechos con esta tarjeta: los de otras tarjetas del mismo local no cuentan.
+        List<Views.VisitView> visits = data.visitas.stream()
+                .filter(visit -> clientIds.contains(visit.clienteId()) && program.getId().equals(visit.programaId())).toList();
         List<LoyaltyCard> programCards = data.cardEntities.stream().filter(card -> card.getProgram().getId().equals(program.getId())).toList();
 
         List<Map<String, Object>> lastRedemptions = visits.stream()

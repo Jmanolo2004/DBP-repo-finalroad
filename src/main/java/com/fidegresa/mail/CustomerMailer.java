@@ -108,19 +108,35 @@ public class CustomerMailer {
     private Prepared prepare(Long customerId, Message message) {
         Customer customer = em.find(Customer.class, customerId);
         if (customer == null || !emailable(customer)) return null;
+        // Sin permiso para promociones (formulario de la tarjeta) solo recibe la bienvenida.
+        if (Boolean.FALSE.equals(customer.getMarketingConsent()) && !"WELCOME".equals(message.reason())) return null;
         if (sends.existsByCustomerIdAndReasonAndDedupeKey(customerId, message.reason(), message.dedupeKey())) return null;
-        if (customer.getEmailToken() == null) customer.setEmailToken(token());
+        String emailToken = emailToken(customer);
         Business business = customer.getBusiness();
         String name = customer.getFullName();
-        String unsubscribe = webUrl.isEmpty() ? apiUrl.isEmpty() ? null : apiUrl + "/api/v1/public/unsubscribe/" + customer.getEmailToken()
-                : webUrl + "/baja/" + customer.getEmailToken();
-        String header = apiUrl.isEmpty() ? null : apiUrl + "/api/v1/public/unsubscribe/" + customer.getEmailToken();
+        String unsubscribe = webUrl.isEmpty() ? apiUrl.isEmpty() ? null : apiUrl + "/api/v1/public/unsubscribe/" + emailToken
+                : webUrl + "/baja/" + emailToken;
+        String header = apiUrl.isEmpty() ? null : apiUrl + "/api/v1/public/unsubscribe/" + emailToken;
         Content content = new Content(business.getName(), business.getPrimaryColor(), logoFor(business.getId()),
                 EmailTemplates.fill(message.title(), name, business.getName()), EmailTemplates.fill(message.body(), name, business.getName()),
                 EmailTemplates.fill(message.benefit(), name, business.getName()), message.buttons(), message.footnote(), unsubscribe);
         // Sin saltos de línea en el asunto: nunca se pueden colar cabeceras de correo.
         String subject = EmailTemplates.fill(message.subject(), name, business.getName()).replaceAll("[\\r\\n]+", " ").trim();
         return new Prepared(customer.getEmail(), subject, content, business.getId(), header);
+    }
+
+    /**
+     * Token de baja del cliente; se crea con su primer correo. Se guarda solo esa columna (no la fila completa): así un correo
+     * enviado en segundo plano nunca pisa cambios que se hicieron al cliente al mismo tiempo.
+     */
+    private String emailToken(Customer customer) {
+        if (customer.getEmailToken() != null) return customer.getEmailToken();
+        String created = token();
+        int updated = em.createQuery("update Customer c set c.emailToken = :token where c.id = :id and c.emailToken is null")
+                .setParameter("token", created).setParameter("id", customer.getId()).executeUpdate();
+        if (updated == 1) return created;
+        return em.createQuery("select c.emailToken from Customer c where c.id = :id", String.class)
+                .setParameter("id", customer.getId()).getSingleResult(); // otro correo lo creó al mismo tiempo
     }
 
     /** Logo del primer programa activo del negocio que tenga uno; si no, el logo general (MAIL_LOGO_URL). */

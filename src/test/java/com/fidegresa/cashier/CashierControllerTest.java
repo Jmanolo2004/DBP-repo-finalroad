@@ -151,8 +151,8 @@ class CashierControllerTest {
         amount(card, "balance-charges", "20").andExpect(status().isOk()).andExpect(jsonPath("$.giftBalance").value(30.0));
         amount(card, "balance-charges", "30.01").andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(containsString("S/ 30.00")));
-        // Una gift card no acumula compras.
-        amount(card, "purchases", "10").andExpect(status().isUnprocessableEntity());
+        // En una gift card, la compra carga saldo (el cliente la compra o la recarga en caja).
+        amount(card, "purchases", "10").andExpect(status().isOk()).andExpect(jsonPath("$.giftBalance").value(40.0));
     }
 
     @Test

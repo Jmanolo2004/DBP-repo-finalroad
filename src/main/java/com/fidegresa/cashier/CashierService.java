@@ -186,10 +186,18 @@ public class CashierService {
         String type = card.getProgram().getType();
         ProgramRules rules = new ProgramRules(card.getProgram());
 
-        if (!ProgramRules.CASHBACK.equals(type) && !ProgramRules.LEVELS.equals(type)) {
-            throw ApiException.unprocessable("Las compras solo suman saldo en programas de cashback o de niveles.");
+        if (!ProgramRules.CASHBACK.equals(type) && !ProgramRules.LEVELS.equals(type) && !ProgramRules.GIFT.equals(type)) {
+            throw ApiException.unprocessable("Las compras solo suman saldo en programas de cashback, niveles o gift card.");
         }
         Branch branch = branch(request.branchId());
+
+        if (ProgramRules.GIFT.equals(type)) {
+            // Gift card: la compra carga saldo (el cliente paga en caja y el monto queda en su tarjeta).
+            card.setGiftBalance(CashierMapper.money(card.getGiftBalance()).add(amount));
+            card.setGiftInitialAmount(CashierMapper.money(card.getGiftInitialAmount()).add(amount));
+            record(op, branch, TransactionType.PURCHASE, amount, amount, "SOLES", false);
+            return mapper.toCard(card);
+        }
 
         if (ProgramRules.CASHBACK.equals(type)) {
             BigDecimal earned = amount.multiply(rules.cashbackPercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -339,7 +347,12 @@ public class CashierService {
             }
             case REDEMPTION -> card.setStamps(card.getStamps() + units.intValue());
             case PURCHASE -> {
-                if (ProgramRules.LEVELS.equals(type)) {
+                if (ProgramRules.GIFT.equals(type)) {
+                    BigDecimal balance = CashierMapper.money(card.getGiftBalance());
+                    if (balance.compareTo(units) < 0) throw ApiException.conflict("El saldo de esta carga ya se usó.");
+                    card.setGiftBalance(balance.subtract(units));
+                    card.setGiftInitialAmount(CashierMapper.money(card.getGiftInitialAmount()).subtract(units).max(BigDecimal.ZERO));
+                } else if (ProgramRules.LEVELS.equals(type)) {
                     if (card.getPoints() < units.intValue()) throw ApiException.conflict("Los puntos de esta compra ya no están en la tarjeta.");
                     card.setPoints(card.getPoints() - units.intValue());
                 } else {

@@ -37,13 +37,21 @@ public class CardIssuer {
     }
 
     public LoyaltyCard newCard(Customer customer, LoyaltyProgram program) {
+        return newCard(customer, program, false);
+    }
+
+    /**
+     * emptyGift: la gift card nace con S/ 0.00 (registro desde el formulario público: el saldo lo carga la caja
+     * cuando el cliente la compra). Sin emptyGift, conserva el monto inicial del programa como hasta ahora.
+     */
+    public LoyaltyCard newCard(Customer customer, LoyaltyProgram program, boolean emptyGift) {
         LoyaltyCard card = new LoyaltyCard();
         card.setCustomer(customer);
         card.setProgram(program);
         card.setQrToken(uniqueToken(program.getType()));
         card.setExpiresAt(ZonedDateTime.now(ZoneId.of("America/Lima")).plusMonths(program.getValidityMonths()).toInstant());
         if ("Giftcard".equals(program.getType())) {
-            BigDecimal amount = firstGiftAmount(program);
+            BigDecimal amount = emptyGift ? BigDecimal.ZERO.setScale(2) : firstGiftAmount(program);
             card.setGiftInitialAmount(amount);
             card.setGiftBalance(amount);
         }

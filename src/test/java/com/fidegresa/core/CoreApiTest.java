@@ -162,8 +162,13 @@ class CoreApiTest {
         long programId = json.readTree(mvc.perform(post("/api/v1/loyalty-programs").header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(program))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
-        String qrToken = json.readTree(mvc.perform(get("/api/v1/loyalty-programs/" + programId + "/customers").header("Authorization", bearer()))
-                .andReturn().getResponse().getContentAsString()).at("/content/0/qrToken").asText();
+        // Una tarjeta nueva empieza sin clientes: el primero se registra con su formulario público.
+        String code = json.readTree(mvc.perform(get("/api/v1/loyalty-programs/" + programId + "/join-link").header("Authorization", bearer()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("code").asText();
+        String qrToken = json.readTree(mvc.perform(post("/api/v1/public/join/" + code).header("X-Test-Ip", java.util.UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Rosa\",\"lastName\":\"Paz\",\"email\":\"rosa.eliminar@correo.pe\",\"birthDate\":\"1990-04-12\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).at("/card/qrToken").asText();
         long cardId = json.readTree(mvc.perform(get("/api/v1/cards/qr/" + qrToken).header("Authorization", bearer()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("id").asLong();
         mvc.perform(post("/api/v1/cards/" + cardId + "/stamps").header("Authorization", bearer())

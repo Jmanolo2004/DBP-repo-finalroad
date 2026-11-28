@@ -20,12 +20,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,10 +56,13 @@ public class AudienceService {
     private final AudienceMatcher matcher;
     private final ObjectProvider<JavaMailSender> mailSender;
     private final String mailUsername;
+    private final ApplicationEventPublisher events;
+    private final TransactionTemplate tx;
 
     AudienceService(CurrentUser currentUser, BusinessDataLoader loader, BusinessRepository businesses, AudienceRepository audiences,
                     AudienceMatcher matcher, ObjectProvider<JavaMailSender> mailSender,
-                    @Value("${spring.mail.username:}") String mailUsername) {
+                    @Value("${spring.mail.username:}") String mailUsername, ApplicationEventPublisher events,
+                    PlatformTransactionManager transactions) {
         this.currentUser = currentUser;
         this.loader = loader;
         this.businesses = businesses;
@@ -61,6 +70,8 @@ public class AudienceService {
         this.matcher = matcher;
         this.mailSender = mailSender;
         this.mailUsername = mailUsername;
+        this.events = events;
+        this.tx = new TransactionTemplate(transactions);
     }
 
     // ---------- Endpoints ----------
@@ -155,6 +166,50 @@ public class AudienceService {
         audience.setData(next);
         audience.setUpdatedAt(Instant.now());
         return json(audiences.save(audience), data);
+    }
+
+    /**
+     * Cada minuto: las audiencias programadas cuya fecha y hora (Lima) ya llegaron se activan y su aviso sale a Google Wallet.
+     * Cada audiencia va en su propia transacción: si una falla, las demás igual se envían.
+     */
+    @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
+    void sendScheduled() {
+        LocalDateTime now = LocalDateTime.now(AudienceMatcher.LIMA);
+        List<Long> due = tx.execute(status -> audiences.findAll().stream()
+                .filter(audience -> "Programada".equals(audience.getData().get("estado")) && due(audience.getData(), now))
+                .map(Audience::getId).toList());
+        for (Long id : due == null ? List.<Long>of() : due) {
+            try {
+                tx.executeWithoutResult(status -> audiences.findById(id)
+                        .filter(audience -> "Programada".equals(audience.getData().get("estado")))
+                        .ifPresent(this::activateScheduled));
+            } catch (RuntimeException e) {
+                log.warn("No se pudo enviar la audiencia programada {}: {}", id, e.getMessage());
+            }
+        }
+    }
+
+    private void activateScheduled(Audience audience) {
+        BusinessData data = loader.load(audience.getBusiness());
+        Map<String, Object> next = recordSends(data, audience);
+        next.put("estado", "Activa");
+        audience.setData(next);
+        audience.setUpdatedAt(Instant.now());
+        audiences.save(audience);
+    }
+
+    /** ¿Ya llegó la fecha y hora de envío? Sin fecha válida no se envía sola. */
+    static boolean due(Map<String, Object> audience, LocalDateTime now) {
+        Map<String, Object> schedule = Js.map(Js.or(audience.get("schedule"), audience.get("programacion")));
+        if (schedule == null) return false;
+        try {
+            LocalDate date = LocalDate.parse(String.valueOf(schedule.get("date")));
+            Object time = schedule.get("time");
+            LocalTime at = time == null || String.valueOf(time).isBlank() ? LocalTime.of(10, 0) : LocalTime.parse(String.valueOf(time));
+            return !LocalDateTime.of(date, at).isAfter(now);
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** Envía la notificación de prueba por correo al usuario del panel (no a los clientes). */
@@ -335,7 +390,15 @@ public class AudienceService {
         next.put("personas", match.eligible().size());
         next.put("excluidosSinConsentimiento", match.excluded());
         next.put("envios", sends);
-        if (!match.eligible().isEmpty()) next.put("ultimoEnvio", now.toString());
+        if (!match.eligible().isEmpty()) {
+            next.put("ultimoEnvio", now.toString());
+            // El aviso sale a Google Wallet después de guardar (si la activación falla, no se envía nada).
+            List<AudienceWalletEvent.Recipient> recipients = match.eligible().stream()
+                    .map(c -> new AudienceWalletEvent.Recipient(c.customer().id(), firstName(c.customer().nombre()))).toList();
+            events.publishEvent(new AudienceWalletEvent(audience.getBusiness().getId(), audience.getId(), String.valueOf(now.toEpochMilli()),
+                    String.valueOf(Js.or(next.get("titulo"), "")), String.valueOf(Js.or(next.get("mensaje"), "")),
+                    String.valueOf(Js.or(next.get("local"), "")), recipients));
+        }
         return next;
     }
 
@@ -413,6 +476,11 @@ public class AudienceService {
             days.add(day);
         }
         return days;
+    }
+
+    private static String firstName(String fullName) {
+        String clean = fullName == null ? "" : fullName.trim();
+        return clean.isEmpty() ? "" : clean.split("\\s+")[0];
     }
 
     private static String personalize(Object text, String firstName, String local) {

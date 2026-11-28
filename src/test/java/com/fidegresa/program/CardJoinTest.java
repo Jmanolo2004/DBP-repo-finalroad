@@ -180,7 +180,9 @@ class CardJoinTest {
                 .get("saldo").decimalValue()).isEqualByComparingTo("25.00");
 
         // Anular la carga la quita.
-        long loadId = read(get("/api/v1/cards/" + cardId + "/transactions"), token).at("/content/0/id").asLong();
+        JsonNode history = read(get("/api/v1/cards/" + cardId + "/transactions"), token);
+        assertThat(history.at("/content/0/type").asText()).isEqualTo("GIFT_LOAD");
+        long loadId = history.at("/content/0/id").asLong();
         mvc.perform(delete("/api/v1/transactions/" + loadId).header("Authorization", token)).andExpect(status().is2xxSuccessful());
         assertThat(read(get("/api/v1/cards/qr/" + qrToken), token).get("giftBalance").asDouble()).isZero();
     }

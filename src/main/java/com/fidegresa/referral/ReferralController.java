@@ -37,6 +37,13 @@ public class ReferralController {
         return referrals.stats(businessId(), from, to);
     }
 
+    /** Ranking de embajadores con todas las invitaciones (o las de un rango si llegan from/to); limit de 1 a 50, 5 por defecto. */
+    @GetMapping("/referrals/ranking")
+    public List<RankingItem> ranking(@RequestParam(required = false) String from, @RequestParam(required = false) String to,
+                                     @RequestParam(required = false) Integer limit) {
+        return referrals.ranking(businessId(), from, to, limit);
+    }
+
     @GetMapping("/referrals/settings")
     public List<SettingsItem> settings() {
         return referrals.settings(businessId());

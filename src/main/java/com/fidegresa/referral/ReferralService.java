@@ -240,6 +240,28 @@ public class ReferralService {
                 new Previous(previous.from(), previous.to(), before.linkOpens(), before.signups(), before.converted(), before.rewards()));
     }
 
+    /**
+     * Quiénes más invitaron, contando todas las invitaciones en la base (no solo una página). Orden: más convertidas, más
+     * invitaciones y luego nombre. Con from/to cuenta solo las invitaciones creadas en ese rango.
+     */
+    @Transactional(readOnly = true)
+    public List<RankingItem> ranking(Long businessId, String from, String to, Integer limit) {
+        int size = limit == null ? 5 : limit;
+        if (size < 1 || size > 50) throw ApiException.badRequest("El límite del ranking va de 1 a 50.");
+        boolean ranged = (from != null && !from.isBlank()) || (to != null && !to.isBlank());
+        DateRange range = ranged ? DateRange.parse(from, to) : null;
+        String jpql = "select c.id, c.fullName, count(r), sum(case when r.status <> 'PENDING' then 1 else 0 end)"
+                + " from Referral r join r.referrer c where r.business.id = :b"
+                + (ranged ? " and r.createdAt >= :start and r.createdAt < :end" : "")
+                + " group by c.id, c.fullName"
+                + " order by sum(case when r.status <> 'PENDING' then 1 else 0 end) desc, count(r) desc, lower(c.fullName) asc, c.id asc";
+        var query = em.createQuery(jpql, Object[].class).setParameter("b", businessId).setMaxResults(size);
+        if (ranged) query.setParameter("start", range.start()).setParameter("end", range.end());
+        return query.getResultList().stream()
+                .map(row -> new RankingItem((Long) row[0], (String) row[1], ((Number) row[2]).longValue(), ((Number) row[3]).longValue()))
+                .toList();
+    }
+
     private Counts counts(Long businessId, ProfitabilityPeriod period) {
         DateRange range = new DateRange(period.from(), period.to());
         long opens = em.createQuery("select coalesce(sum(s.opens), 0) from ReferralLinkStat s where s.business.id = :b"

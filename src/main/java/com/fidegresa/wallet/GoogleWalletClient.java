@@ -3,6 +3,8 @@ package com.fidegresa.wallet;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -33,6 +35,7 @@ import java.util.Map;
  */
 @Component
 public class GoogleWalletClient {
+    private static final Logger log = LoggerFactory.getLogger(GoogleWalletClient.class);
     static final String SCOPE = "https://www.googleapis.com/auth/wallet_object.issuer";
     private static final String SAVE_URL = "https://pay.google.com/gp/v/save/";
 
@@ -79,15 +82,28 @@ public class GoogleWalletClient {
         String email = null;
         PrivateKey key = null;
         if (!issuer.isEmpty() && serviceAccount != null && !serviceAccount.isBlank()) {
+            // Si la cuenta de servicio está mal pegada, el backend igual arranca: solo Google Wallet queda apagado
+            // y el log explica qué revisar (nunca se imprime la llave).
             try {
-                JsonNode json = mapper.readTree(serviceAccount);
+                JsonNode json = mapper.readTree(unquote(serviceAccount));
                 email = json.path("client_email").asText(null);
-                key = privateKey(json.path("private_key").asText(""));
-            } catch (IOException | GeneralSecurityException | IllegalArgumentException e) {
-                throw new IllegalStateException("GOOGLE_WALLET_SERVICE_ACCOUNT no es el JSON de una cuenta de servicio válida.", e);
+                if (email == null || email.isBlank()) {
+                    log.error("Google Wallet apagado: GOOGLE_WALLET_SERVICE_ACCOUNT no tiene client_email. Pega el contenido completo del archivo JSON de la cuenta de servicio.");
+                } else {
+                    key = privateKey(json.path("private_key").asText(""));
+                }
+            } catch (IOException e) {
+                log.error("Google Wallet apagado: GOOGLE_WALLET_SERVICE_ACCOUNT no es un JSON válido ({}). Debe empezar con { y terminar con }, "
+                        + "sin comillas alrededor: pega el contenido completo del archivo JSON de la cuenta de servicio.", e.getClass().getSimpleName());
+            } catch (GeneralSecurityException | IllegalArgumentException e) {
+                log.error("Google Wallet apagado: la private_key de GOOGLE_WALLET_SERVICE_ACCOUNT no se pudo leer. Descarga una clave JSON nueva de la cuenta de servicio.");
             }
-            if (email == null || email.isBlank()) throw new IllegalStateException("GOOGLE_WALLET_SERVICE_ACCOUNT no tiene client_email.");
+            if (key != null && !issuer.matches("\\d+")) {
+                log.error("Google Wallet apagado: GOOGLE_WALLET_ISSUER_ID debe tener solo números (el ID de emisor de Google Pay & Wallet Console).");
+                key = null;
+            }
         }
+        if (key == null) email = null;
         this.issuerId = key == null ? "" : issuer;
         this.clientEmail = email;
         this.privateKey = key;
@@ -199,6 +215,16 @@ public class GoogleWalletClient {
         } catch (IOException | GeneralSecurityException e) {
             throw new IllegalStateException("No se pudo firmar el pase de Google Wallet.", e);
         }
+    }
+
+    /** Quita comillas que a veces quedan alrededor al copiar el valor de otro panel ("{...}" o '{...}'). */
+    static String unquote(String value) {
+        String clean = value.trim();
+        if (clean.length() > 1 && (clean.startsWith("\"") && clean.endsWith("\"") || clean.startsWith("'") && clean.endsWith("'"))) {
+            String inner = clean.substring(1, clean.length() - 1).trim();
+            if (inner.startsWith("{")) return inner;
+        }
+        return clean;
     }
 
     private static PrivateKey privateKey(String pem) throws GeneralSecurityException {

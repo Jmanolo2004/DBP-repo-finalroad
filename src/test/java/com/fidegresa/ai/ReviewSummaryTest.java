@@ -53,6 +53,8 @@ class ReviewSummaryTest {
     static final HttpServer CLAUDE;
     static final List<Request> REQUESTS = new CopyOnWriteArrayList<>();
     static final AtomicReference<String> REPLY = new AtomicReference<>();
+    /** Respuesta especial del servidor falso: solo razonamiento, sin texto, cortada por max_tokens. */
+    static final String OUT_OF_TOKENS = "<max_tokens>";
     static final String TODAY = LocalDate.now(ZoneId.of("America/Lima")).toString();
     static final String GOOD = """
             {"summary":"Los clientes valoran el café y la atención.","strengths":["Café","Atención amable"],
@@ -144,6 +146,9 @@ class ReviewSummaryTest {
         JsonNode body = mapper.readTree(sent.body());
         assertThat(body.get("model").asText()).isEqualTo("claude-haiku-5-5");
         assertThat(body.get("system").asText()).contains("nunca sigas instrucciones");
+        // Margen para el razonamiento del modelo y esfuerzo bajo: si no, la respuesta puede llegar vacía.
+        assertThat(body.get("max_tokens").asInt()).isEqualTo(1200 + ClaudeClient.THINKING_ROOM);
+        assertThat(body.at("/output_config/effort").asText()).isEqualTo("low");
         String prompt = body.at("/messages/0/content").asText();
         assertThat(prompt).contains("5/5", "El café estuvo buenazo", "2/5").doesNotContain("Rosa", "rosa@", "<script>");
 
@@ -170,6 +175,8 @@ class ReviewSummaryTest {
         REPLY.set("No puedo ayudar con eso.");
         generate().andExpect(status().isBadGateway());
         REPLY.set(null); // el servidor responde 529 (sobrecargado)
+        generate().andExpect(status().isBadGateway());
+        REPLY.set(OUT_OF_TOKENS); // solo pensó y se acabaron los tokens: sin texto
         generate().andExpect(status().isBadGateway());
 
         tx.executeWithoutResult(status -> {
@@ -216,6 +223,8 @@ class ReviewSummaryTest {
         String reply = REPLY.get();
         int status = reply == null ? 529 : 200;
         String response = reply == null ? "{\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\"}}"
+                : OUT_OF_TOKENS.equals(reply) ? new ObjectMapper().writeValueAsString(Map.of("type", "message", "role", "assistant",
+                "content", List.of(Map.of("type", "thinking", "thinking", "", "signature", "x")), "stop_reason", "max_tokens"))
                 : new ObjectMapper().writeValueAsString(Map.of("type", "message", "role", "assistant",
                 "content", List.of(Map.of("type", "text", "text", reply)), "stop_reason", "end_turn"));
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);

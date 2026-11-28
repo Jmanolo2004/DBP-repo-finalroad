@@ -20,6 +20,8 @@ import java.time.Duration;
 @Component
 public class ClaudeClient {
     static final String VERSION = "2023-06-01";
+    /** Tokens extra para el razonamiento del modelo, aparte de los que necesita la respuesta. */
+    static final int THINKING_ROOM = 4000;
 
     /** Error de la API con su código HTTP (0 si no hubo respuesta). */
     public static class ClaudeException extends IOException {
@@ -59,7 +61,11 @@ public class ClaudeClient {
 
     /** Envía un mensaje y devuelve el texto de la respuesta. */
     public String complete(String system, String user, int maxTokens) throws IOException {
-        ObjectNode body = mapper.createObjectNode().put("model", model).put("max_tokens", maxTokens).put("system", system);
+        // Los modelos actuales piensan antes de responder y ese razonamiento también gasta max_tokens: con un tope
+        // chico se acaba antes de escribir la respuesta. Por eso se suma margen y se pide esfuerzo bajo
+        // (las tareas son cortas: un resumen, una respuesta o una promoción).
+        ObjectNode body = mapper.createObjectNode().put("model", model).put("max_tokens", maxTokens + THINKING_ROOM).put("system", system);
+        body.putObject("output_config").put("effort", "low");
         body.putArray("messages").addObject().put("role", "user").put("content", user);
         HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl)).timeout(Duration.ofSeconds(60))
                 .header("x-api-key", apiKey).header("anthropic-version", VERSION).header("content-type", "application/json")
@@ -76,9 +82,15 @@ public class ClaudeClient {
             throw new ClaudeException(response.statusCode(), "Claude respondió " + response.statusCode() + ": "
                     + (text.length() > 300 ? text.substring(0, 300) : text));
         }
+        JsonNode reply = mapper.readTree(response.body());
         StringBuilder text = new StringBuilder();
-        for (JsonNode block : mapper.readTree(response.body()).path("content")) {
+        for (JsonNode block : reply.path("content")) {
             if ("text".equals(block.path("type").asText())) text.append(block.path("text").asText());
+        }
+        String stopReason = reply.path("stop_reason").asText("");
+        if (text.isEmpty() && !stopReason.isEmpty() && !"end_turn".equals(stopReason)) {
+            // Sin texto: se acabaron los tokens ("max_tokens") o Claude no quiso responder ("refusal").
+            throw new ClaudeException(200, "Claude terminó sin texto (stop_reason: " + stopReason + ")");
         }
         return text.toString();
     }

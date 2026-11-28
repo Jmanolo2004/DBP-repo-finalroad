@@ -1,5 +1,6 @@
 package com.fidegresa.publicmenu;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -8,9 +9,16 @@ public final class PublicMenuDtos {
     private PublicMenuDtos() {
     }
 
-    /** pdf, webUrl e invitation son null si el local no los tiene activos. */
+    /**
+     * pdf, webUrl e invitation son null si el local no los tiene activos. products: la carta oficial del local (en su orden,
+     * con los agotados marcados); lista vacía si no tiene productos.
+     */
     public record MenuResponse(String slug, BusinessInfo business, BranchInfo branch, PdfCatalog pdf, String webUrl,
-                               InvitationInfo invitation, List<ProgramInfo> programs, ConsentInfo consent) {
+                               InvitationInfo invitation, List<ProgramInfo> programs, ConsentInfo consent, List<ProductInfo> products) {
+    }
+
+    /** Producto de la carta; imageUrl es null si no tiene foto (es una dirección pública, sin sesión). */
+    public record ProductInfo(Long id, String name, String description, BigDecimal price, boolean inStock, String imageUrl) {
     }
 
     public record BusinessInfo(String name, String primaryColor) {

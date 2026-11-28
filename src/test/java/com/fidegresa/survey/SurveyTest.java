@@ -58,7 +58,8 @@ class SurveyTest {
     static final Set<String> OBJECTS = new HashSet<>();
     static final String ACCOUNT;
     static final Pattern LINK = Pattern.compile("https://frontendfidegresa\\.vercel\\.app/encuesta/([A-Za-z0-9_-]+)");
-    static final String TODAY = LocalDate.now(ZoneId.of("America/Lima")).toString();
+    static final ZoneId LIMA = ZoneId.of("America/Lima");
+    static final String TODAY = LocalDate.now(LIMA).toString();
 
     static {
         try {
@@ -202,6 +203,66 @@ class SurveyTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/surveys/settings")).andExpect(status().isUnauthorized());
         call(get("/api/v1/metrics/surveys").param("from", "2026-01-01").param("to", "2027-06-01")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void queMePedisteGuardaLosProductosYSaleEnLosResultados() throws Exception {
+        String base = "/api/v1/branches/" + branchId + "/products";
+        long latte = read(post(base).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Latte de prueba\",\"price\":11}")).get("id").asLong();
+        long brownie = read(post(base).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Brownie de prueba\",\"price\":7.5}")).get("id").asLong();
+        Long otherBranch = branches.findByBusinessIdOrderByIdAsc(businessId).get(1).getId();
+        long elsewhere = read(post("/api/v1/branches/" + otherBranch + "/products").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"De otro local\",\"price\":5}")).get("id").asLong();
+
+        // Invitación de hace 3 días (sigue vigente): así no se mezcla con las métricas de hoy de las otras pruebas.
+        LocalDate day = LocalDate.now(LIMA).minusDays(3);
+        SurveyInvitation invitation = tx.execute(status -> {
+            var card = cards.findById(card(3)).orElseThrow();
+            SurveyInvitation created = new SurveyInvitation();
+            created.setToken("pedido-" + UUID.randomUUID().toString().replace("-", ""));
+            created.setChannel("WALLET");
+            created.setSentAt(day.atTime(12, 0).atZone(LIMA).toInstant());
+            created.setExpiresAt(Instant.now().plus(Duration.ofDays(4)));
+            created.setCustomer(card.getCustomer());
+            created.setBranch(branches.findById(branchId).orElseThrow());
+            created.setBusiness(card.getCustomer().getBusiness());
+            return invitations.save(created);
+        });
+        String survey = invitation.getToken();
+
+        JsonNode page = mapper.readTree(mvc.perform(get("/api/v1/public/surveys/" + survey)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        List<Long> offered = new java.util.ArrayList<>();
+        page.get("products").forEach(product -> offered.add(product.get("id").asLong()));
+        assertThat(offered).contains(latte, brownie).doesNotContain(elsewhere);
+
+        answer(survey, "{\"rating\":4,\"productIds\":[" + elsewhere + "]}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Elige productos de la carta de este local."));
+        answer(survey, "{\"rating\":4,\"productIds\":[999999]}").andExpect(status().isBadRequest());
+        answer(survey, "{\"rating\":4,\"productIds\":[1,2,3,4,5,6]}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Elige hasta 5 productos."));
+        answer(survey, "{\"rating\":4,\"orderNote\":\"" + "x".repeat(121) + "\"}").andExpect(status().isBadRequest());
+        // Nada de lo anterior se guardó: la encuesta sigue abierta.
+        answer(survey, "{\"rating\":4,\"productIds\":[" + latte + "," + brownie + "," + latte + "],\"orderNote\":\"  Latte   sin azúcar \"}")
+                .andExpect(status().isOk());
+        String note = tx.execute(status -> invitations.findByToken(survey).orElseThrow().getOrderNote());
+        assertThat(note).isEqualTo("Latte sin azúcar");
+
+        // Borrar el producto de la carta no borra lo que se pidió.
+        call(delete(base + "/" + latte)).andExpect(status().isNoContent());
+        JsonNode metrics = read(get("/api/v1/metrics/surveys").param("from", day.toString()).param("to", day.toString()));
+        JsonNode top = metrics.get("topProducts");
+        assertThat(top).hasSize(2);
+        assertThat(top.at("/0/name").asText()).isEqualTo("Brownie de prueba");
+        assertThat(top.at("/1/name").asText()).isEqualTo("Latte de prueba");
+        assertThat(top.at("/1/productId").asLong()).isEqualTo(latte);
+        assertThat(top.at("/0/orders").asLong()).isEqualTo(1);
+        assertThat(top.at("/0/averageRating").decimalValue()).isEqualByComparingTo("4.0");
+        assertThat(read(get("/api/v1/metrics/surveys").param("from", day.toString()).param("to", day.toString())
+                .param("branchId", String.valueOf(otherBranch))).get("topProducts")).isEmpty();
+
+        call(delete(base + "/" + brownie)).andExpect(status().isNoContent());
+        call(delete("/api/v1/branches/" + otherBranch + "/products/" + elsewhere)).andExpect(status().isNoContent());
     }
 
     // ---------- servidor falso de Google ----------

@@ -242,6 +242,29 @@ class CashierControllerTest {
         mvc.perform(get("/api/v1/transactions")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void filtraElHistorialPorTipoYPorTarjeta() throws Exception {
+        LoyaltyCard cashback = updated(card("Cashback de la Plaza", 1), c -> c.setCashbackBalance(BigDecimal.ZERO));
+        amount(cashback, "purchases", "40").andExpect(status().isOk());
+        Long cashbackProgram = transactions.execute(status -> cardRepository.findById(cashback.getId()).orElseThrow().getProgram().getId());
+
+        JsonNode byType = read(call(get("/api/v1/transactions?programType=CASHBACK&size=50")).andExpect(status().isOk())).get("content");
+        org.assertj.core.api.Assertions.assertThat(byType).isNotEmpty();
+        byType.forEach(item -> org.assertj.core.api.Assertions.assertThat(item.get("programType").asText()).isEqualTo("CASHBACK"));
+        // También acepta el nombre en español y se combina con el local.
+        call(get("/api/v1/transactions?programType=Cashback&branchId=" + plazaId)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].programType").value("CASHBACK"));
+
+        JsonNode byProgram = read(call(get("/api/v1/transactions?programId=" + cashbackProgram + "&size=50"))).get("content");
+        org.assertj.core.api.Assertions.assertThat(byProgram).isNotEmpty();
+        byProgram.forEach(item -> org.assertj.core.api.Assertions.assertThat(item.get("programName").asText()).isEqualTo("Cashback de la Plaza"));
+
+        // Un programa que no es del negocio no trae nada; un tipo desconocido es un error claro.
+        call(get("/api/v1/transactions?programId=999999")).andExpect(status().isOk()).andExpect(jsonPath("$.content").isEmpty());
+        call(get("/api/v1/transactions?programType=PUNTOS")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Tipo de tarjeta no válido")));
+    }
+
     // ---- ayudas ----
 
     /** Dentro de una transacción: en PostgreSQL el logo y la portada del programa (@Lob) no se leen en auto-commit. */

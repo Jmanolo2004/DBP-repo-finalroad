@@ -38,6 +38,20 @@ interface CashierTransactionRepository extends JpaRepository<CardTransaction, Lo
     Page<CardTransaction> pageByBranch(@Param("businessId") Long businessId, @Param("branchId") Long branchId,
                                        @Param("types") Collection<TransactionType> types, Pageable pageable);
 
+    /**
+     * Historial con filtros opcionales (null = sin filtro): local, una tarjeta (programa) o un tipo de tarjeta
+     * ("Estampillas", "Cashback", "Niveles" o "Giftcard", como se guarda en el programa).
+     */
+    @Query(value = WITH_DETAILS + "where t.business.id = :businessId and t.voided = false and t.type in :types "
+            + "and (:branchId is null or t.branch.id = :branchId) and (:programId is null or c.program.id = :programId) "
+            + "and (:programType is null or c.program.type = :programType)",
+            countQuery = COUNT + "where t.business.id = :businessId and t.voided = false and t.card is not null and t.type in :types "
+                    + "and (:branchId is null or t.branch.id = :branchId) and (:programId is null or t.card.program.id = :programId) "
+                    + "and (:programType is null or t.card.program.type = :programType)")
+    Page<CardTransaction> pageFiltered(@Param("businessId") Long businessId, @Param("branchId") Long branchId,
+                                       @Param("programId") Long programId, @Param("programType") String programType,
+                                       @Param("types") Collection<TransactionType> types, Pageable pageable);
+
     /** Suma de unidades (sellos o soles de cashback) de un tipo desde una fecha, sin contar anulados; null si no hay. */
     @Query("select sum(t.units) from CardTransaction t where t.card.id = :cardId and t.type = :type "
             + "and t.voided = false and t.createdAt >= :since")

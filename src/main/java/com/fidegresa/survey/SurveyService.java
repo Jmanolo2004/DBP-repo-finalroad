@@ -5,7 +5,9 @@ import com.fidegresa.common.DateRange;
 import com.fidegresa.mail.CustomerMailer;
 import com.fidegresa.metrics.ProfitabilityPeriod;
 import com.fidegresa.model.*;
+import com.fidegresa.publicmenu.PublicMenuService;
 import com.fidegresa.repository.BranchRepository;
+import com.fidegresa.repository.MenuProductRepository;
 import com.fidegresa.repository.SurveyInvitationRepository;
 import com.fidegresa.repository.SurveySettingsRepository;
 import com.fidegresa.survey.SurveyDtos.*;
@@ -25,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,21 +38,29 @@ public class SurveyService {
     static final Duration VALID_FOR = Duration.ofDays(7);
     static final String SOURCE = "SURVEY";
     private static final int MAX_DAYS = 366;
+    static final int MAX_ORDERED = 5;
+    static final int MAX_ORDER_NOTE = 120;
+    private static final int TOP_PRODUCTS = 5;
 
     private final SurveySettingsRepository settings;
     private final SurveyInvitationRepository invitations;
     private final BranchRepository branches;
     private final GoogleWalletService wallet;
+    private final PublicMenuService publicMenu;
+    private final MenuProductRepository products;
     private final EntityManager em;
     private final String webUrl;
     private final SecureRandom random = new SecureRandom();
 
     public SurveyService(SurveySettingsRepository settings, SurveyInvitationRepository invitations, BranchRepository branches,
-                         GoogleWalletService wallet, EntityManager em, @Value("${app.public.web-url:}") String webUrl) {
+                         GoogleWalletService wallet, PublicMenuService publicMenu, MenuProductRepository products, EntityManager em,
+                         @Value("${app.public.web-url:}") String webUrl) {
         this.settings = settings;
         this.invitations = invitations;
         this.branches = branches;
         this.wallet = wallet;
+        this.publicMenu = publicMenu;
+        this.products = products;
         this.em = em;
         this.webUrl = webUrl == null ? "" : webUrl.trim().replaceAll("/+$", "");
     }
@@ -152,7 +163,8 @@ public class SurveyService {
         SurveyInvitation invitation = find(token);
         SurveySettings config = settings.findByBusinessId(invitation.getBusiness().getId()).orElseGet(SurveySettings::new);
         return new PublicSurvey(invitation.getBusiness().getName(), invitation.getBranch().getName(), config.getQuestion(),
-                invitation.getBusiness().getPrimaryColor(), status(invitation), invitation.getExpiresAt());
+                invitation.getBusiness().getPrimaryColor(), status(invitation), invitation.getExpiresAt(),
+                publicMenu.menuProducts(invitation.getBranch().getId()));
     }
 
     @Transactional
@@ -166,6 +178,9 @@ public class SurveyService {
         }
         String comment = request.comment() == null ? "" : request.comment().trim();
         if (comment.length() > 1000) throw ApiException.badRequest("El comentario puede tener hasta 1000 caracteres.");
+        String orderNote = request.orderNote() == null ? "" : request.orderNote().trim().replaceAll("\\s+", " ");
+        if (orderNote.length() > MAX_ORDER_NOTE) throw ApiException.badRequest("Lo que pediste puede tener hasta " + MAX_ORDER_NOTE + " caracteres.");
+        List<MenuProduct> ordered = orderedProducts(invitation, request.productIds());
         Review review = new Review();
         review.setRating(request.rating());
         review.setComment(comment);
@@ -177,7 +192,31 @@ public class SurveyService {
         em.persist(review);
         invitation.setAnsweredAt(review.getCreatedAt());
         invitation.setReview(review);
+        invitation.setOrderNote(orderNote.isEmpty() ? null : orderNote);
+        for (MenuProduct product : ordered) {
+            SurveyOrderItem item = new SurveyOrderItem();
+            item.setProductId(product.getId());
+            item.setProductName(product.getName());
+            item.setInvitation(invitation);
+            item.setBusiness(invitation.getBusiness());
+            em.persist(item);
+        }
         return new AnswerResponse("ANSWERED", "¡Gracias por tu opinión!");
+    }
+
+    /** "¿Qué pediste?": hasta 5 productos distintos de la carta del local de la visita (sin repetidos ni de otro local). */
+    private List<MenuProduct> orderedProducts(SurveyInvitation invitation, List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) return List.of();
+        if (productIds.contains(null)) throw ApiException.badRequest("Elige productos de la carta de este local.");
+        LinkedHashSet<Long> unique = new LinkedHashSet<>(productIds);
+        if (unique.size() > MAX_ORDERED) throw ApiException.badRequest("Elige hasta " + MAX_ORDERED + " productos.");
+        Long branchId = invitation.getBranch().getId();
+        Map<Long, MenuProduct> found = new HashMap<>();
+        for (MenuProduct product : products.findAllById(unique)) {
+            if (product.getBranch().getId().equals(branchId)) found.put(product.getId(), product);
+        }
+        if (found.size() != unique.size()) throw ApiException.badRequest("Elige productos de la carta de este local.");
+        return unique.stream().map(found::get).toList();
     }
 
     private SurveyInvitation find(String token) {
@@ -220,7 +259,21 @@ public class SurveyService {
                 new Totals(total[0], total[1], rate(total[1], total[0]), average(total)),
                 new Previous(previous.from(), previous.to(), previousTotal[0], previousTotal[1], rate(previousTotal[1], previousTotal[0]),
                         average(previousTotal)),
-                byBranch);
+                byBranch, topProducts(businessId, period, branchId));
+    }
+
+    /** Lo más pedido en las encuestas respondidas (de las invitaciones del periodo) y la nota promedio de quienes lo pidieron. */
+    private List<ProductItem> topProducts(Long businessId, ProfitabilityPeriod period, Long branchId) {
+        DateRange range = new DateRange(period.from(), period.to());
+        String jpql = "select o.productId, max(o.productName), count(o), avg(r.rating) from SurveyOrderItem o join o.invitation i join i.review r"
+                + " where i.business.id = :businessId and i.sentAt >= :start and i.sentAt < :end"
+                + (branchId == null ? "" : " and i.branch.id = :branchId")
+                + " group by o.productId order by count(o) desc, max(o.productName) asc";
+        var query = em.createQuery(jpql, Object[].class).setParameter("businessId", businessId)
+                .setParameter("start", range.start()).setParameter("end", range.end()).setMaxResults(TOP_PRODUCTS);
+        if (branchId != null) query.setParameter("branchId", branchId);
+        return query.getResultList().stream().map(row -> new ProductItem((Long) row[0], (String) row[1], ((Number) row[2]).longValue(),
+                BigDecimal.valueOf(((Number) row[3]).doubleValue()).setScale(1, RoundingMode.HALF_UP))).toList();
     }
 
     /** Por local: [enviadas, respondidas, suma de estrellas], de las invitaciones enviadas en el periodo. */

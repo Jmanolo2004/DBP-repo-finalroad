@@ -63,6 +63,7 @@ public class PublicMenuService {
     private final String consentVersion;
     private final String webUrl;
 
+    private final com.fidegresa.repository.MenuProductRepository products;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final com.fidegresa.referral.ReferralService referrals;
     private final com.fidegresa.referral.ReferralCodes referralCodes;
@@ -74,7 +75,8 @@ public class PublicMenuService {
                              @Value("${app.public.web-url:}") String webUrl,
                              org.springframework.context.ApplicationEventPublisher events,
                              @org.springframework.context.annotation.Lazy com.fidegresa.referral.ReferralService referrals,
-                             com.fidegresa.referral.ReferralCodes referralCodes) {
+                             com.fidegresa.referral.ReferralCodes referralCodes,
+                             com.fidegresa.repository.MenuProductRepository products) {
         this.branches = branches;
         this.catalogs = catalogs;
         this.catalogFiles = catalogFiles;
@@ -90,6 +92,7 @@ public class PublicMenuService {
         this.events = events;
         this.referrals = referrals;
         this.referralCodes = referralCodes;
+        this.products = products;
         this.webUrl = webUrl == null ? "" : webUrl.trim().replaceAll("/+$", "");
     }
 
@@ -128,12 +131,21 @@ public class PublicMenuService {
 
         return new MenuResponse(branch.getPublicSlug(), new BusinessInfo(business.getName(), business.getPrimaryColor()),
                 new BranchInfo(branch.getName(), branch.getCategory(), branch.getAddress(), branch.getDistrict(), branch.getSchedule()),
-                pdf, web, invitation, offered, new ConsentInfo(consentVersion, consentText(business)));
+                pdf, web, invitation, offered, new ConsentInfo(consentVersion, consentText(business)), menuProducts(branch.getId()));
+    }
+
+    /** Carta oficial del local para el menú público y la encuesta ("¿qué pediste?"). */
+    @Transactional(readOnly = true)
+    public List<ProductInfo> menuProducts(Long branchId) {
+        return products.findByBranchIdOrderByPositionAscIdAsc(branchId).stream()
+                .map(product -> new ProductInfo(product.getId(), product.getName(), product.getDescription(), product.getPrice(),
+                        product.isInStock(), product.getImage() == null ? null : fileUrl(product.getImage())))
+                .toList();
     }
 
     /**
-     * Archivo público: solo si es del catálogo PDF activo de un local activo, o la imagen de una invitación vigente.
-     * Cualquier otro archivo (aunque exista) responde 404.
+     * Archivo público: solo si es del catálogo PDF activo de un local activo, la imagen de una invitación vigente o la foto de
+     * un producto de la carta de un local activo. Cualquier otro archivo (aunque exista) responde 404.
      */
     @Transactional(readOnly = true)
     public ResponseEntity<StreamingResponseBody> file(Long fileId, String ifNoneMatch) {
@@ -145,6 +157,10 @@ public class PublicMenuService {
             allowed = invitations.findByImageId(fileId)
                     .filter(invitation -> invitation.getBranch().isActive() && invitationService.live(invitation.getBranch()).isPresent())
                     .map(BranchInvitation::getImage);
+        }
+        if (allowed.isEmpty()) {
+            allowed = products.findFirstByImageId(fileId).filter(product -> product.getBranch().isActive())
+                    .map(com.fidegresa.model.MenuProduct::getImage);
         }
         StoredFile file = allowed.orElseThrow(() -> ApiException.notFound("Archivo no encontrado."));
         return storedFiles.serve(file, ifNoneMatch);
@@ -162,8 +178,44 @@ public class PublicMenuService {
     @Transactional
     public JoinResult join(String slug, JoinRequest request) {
         if (request == null) throw ApiException.badRequest("Completa tus datos para unirte.");
-        Branch branch = branch(slug);
-        if (!Boolean.TRUE.equals(request.consent())) throw ApiException.badRequest("Debes aceptar el uso de tus datos para unirte al club.");
+        return enroll(branch(slug), request, "MENU_QR");
+    }
+
+    /**
+     * Registro en caja: el cajero da de alta al cliente en su local (con el consentimiento que el cliente da en ese momento).
+     * Mismas reglas que el menú con QR; el cliente queda con origen CASHIER.
+     */
+    @Transactional
+    public JoinResult enrollAtCashier(Business business, Long branchId, JoinRequest request) {
+        if (request == null) throw ApiException.badRequest("Completa los datos del cliente.");
+        if (branchId == null) throw ApiException.badRequest("Elige tu local.");
+        Branch branch = branches.findByIdAndBusinessId(branchId, business.getId()).orElseThrow(() -> ApiException.notFound("Local no encontrado."));
+        return enroll(branch, request, "CASHIER");
+    }
+
+    /** Lo que necesita la caja para registrar: programas a los que se puede unir el cliente en el local y el texto del consentimiento. */
+    @Transactional(readOnly = true)
+    public RegistrationOptions registrationOptions(Business business, Long branchId) {
+        Branch branch = branches.findByIdAndBusinessId(branchId, business.getId()).orElseThrow(() -> ApiException.notFound("Local no encontrado."));
+        List<ProgramOption> options = joinablePrograms(branch).stream()
+                .map(p -> new ProgramOption(p.getId(), p.getName(), p.getType(), p.getPrimaryColor(), p.getAccentColor()))
+                .toList();
+        return new RegistrationOptions(branch.getId(), branch.getName(), options, consentText(branch.getBusiness()), consentVersion);
+    }
+
+    public record ProgramOption(Long id, String name, String type, String primaryColor, String accentColor) {
+    }
+
+    /** consentText: lo que el cajero le lee o le muestra al cliente antes de marcar su aceptación. */
+    public record RegistrationOptions(Long branchId, String branchName, List<ProgramOption> programs, String consentText, String consentVersion) {
+    }
+
+    private JoinResult enroll(Branch branch, JoinRequest request, String source) {
+        boolean cashier = "CASHIER".equals(source);
+        if (!Boolean.TRUE.equals(request.consent())) {
+            throw ApiException.badRequest(cashier ? "El cliente debe aceptar el uso de sus datos para registrarlo."
+                    : "Debes aceptar el uso de tus datos para unirte al club.");
+        }
         String fullName = Texts.limit(Texts.required(request.fullName(), "Escribe tu nombre."), 120);
         String email = Texts.required(request.email(), "Escribe tu correo.").toLowerCase(Locale.ROOT);
         if (email.length() > 160 || !Texts.EMAIL.matcher(email).matches()) throw ApiException.badRequest("Escribe un correo válido.");
@@ -176,7 +228,8 @@ public class PublicMenuService {
         if (existing.isPresent()) {
             Customer customer = existing.get();
             if (!phone.equals(lastNineDigits(customer.getPhone()))) {
-                throw ApiException.conflict("Ya estás registrado en este negocio. Pide tu tarjeta en caja.");
+                throw ApiException.conflict(cashier ? "Ese correo ya es de un cliente con otro celular. Búscalo en la lista de clientes."
+                        : "Ya estás registrado en este negocio. Pide tu tarjeta en caja.");
             }
             LoyaltyCard card = cards.findByCustomerIdAndProgramId(customer.getId(), program.getId())
                     .orElseGet(() -> cards.save(cardIssuer.newCard(customer, program)));
@@ -198,7 +251,7 @@ public class PublicMenuService {
         customer.setRegisteredAt(Instant.now());
         customer.setConsentAt(Instant.now());
         customer.setConsentVersion(consentVersion);
-        customer.setSignupSource("MENU_QR");
+        customer.setSignupSource(source);
         customers.save(customer);
         LoyaltyCard card = cards.save(cardIssuer.newCard(customer, program));
         String code = referralCodes.ensure(customer);

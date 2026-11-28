@@ -29,6 +29,10 @@ public final class ReferralDtos {
     }
 
     /** reward: el premio según el tipo del programa, en texto ("1 sello", "S/ 5.00 de cashback", "50 puntos"). */
+    /** Embajador del ranking: invitaciones que hizo y cuántas ya se convirtieron (premiadas o en el tope del mes). */
+    public record RankingItem(Long id, String name, long invited, long converted) {
+    }
+
     public record SettingsItem(Long programId, String programName, String programType, boolean enabled, int rewardStamps,
                                BigDecimal rewardCashback, int rewardPoints, String reward) {
     }

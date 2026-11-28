@@ -14,6 +14,10 @@ public interface MenuProductRepository extends JpaRepository<MenuProduct, Long> 
     @EntityGraph(attributePaths = {"image", "branch"})
     Optional<MenuProduct> findByIdAndBranchIdAndBusinessId(Long id, Long branchId, Long businessId);
 
+    /** Para servir la foto en el menú público: el producto dueño de ese archivo (con su local). */
+    @EntityGraph(attributePaths = {"image", "branch"})
+    Optional<MenuProduct> findFirstByImageId(Long imageId);
+
     long countByBranchId(Long branchId);
 
     boolean existsByBusinessId(Long businessId);

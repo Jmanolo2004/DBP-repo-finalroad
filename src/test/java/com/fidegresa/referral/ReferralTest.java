@@ -2,7 +2,9 @@ package com.fidegresa.referral;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fidegresa.model.AppUser;
 import com.fidegresa.model.Customer;
+import com.fidegresa.model.Role;
 import com.fidegresa.model.LoyaltyCard;
 import com.fidegresa.model.LoyaltyProgram;
 import com.fidegresa.model.Referral;
@@ -55,6 +57,8 @@ class ReferralTest {
     TransactionTemplate tx;
     @Autowired
     EntityManager em;
+    @Autowired
+    org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     record Shop(String token, long businessId, long branchId, long programId, String slug) {
     }
@@ -81,8 +85,26 @@ class ReferralTest {
         assertThat(converted.get("converted").asLong()).isEqualTo(1);
         assertThat(converted.at("/referrals/content/0/status").asText()).isEqualTo("CONVERTED");
         assertThat(converted.at("/referrals/content/0/convertedAt").isNull()).isFalse();
+        // La caja del negocio también ve el enlace (para compartirlo desde la app), con los datos de su propio negocio.
+        JsonNode fromCashier = read(get("/api/v1/business-referrals"), cashierToken(inviter.businessId()));
+        assertThat(fromCashier.get("code").asText()).isEqualTo(code);
+        assertThat(fromCashier.get("converted").asLong()).isEqualTo(1);
         call(delete("/api/v1/account"), invited.token()).andExpect(status().isNoContent());
         assertThat(read(get("/api/v1/business-referrals"), inviter.token()).get("registered").asLong()).isZero();
+    }
+
+    private String cashierToken(long businessId) throws Exception {
+        AppUser cashier = new AppUser();
+        cashier.setEmail("caja-" + UUID.randomUUID().toString().substring(0, 8) + "@negocio.pe");
+        cashier.setFullName("Caja");
+        cashier.setPasswordHash(passwordEncoder.encode("Clave12345"));
+        cashier.setRole(Role.CASHIER);
+        cashier.setBusiness(tx.execute(status -> em.find(com.fidegresa.model.Business.class, businessId)));
+        users.save(cashier);
+        String login = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("email", cashier.getEmail(), "password", "Clave12345"))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return "Bearer " + tree(login).get("token").asText();
     }
 
     @Test
@@ -155,6 +177,67 @@ class ReferralTest {
         Thread.sleep(500);
         assertThat(stamps(mateoCard)).isEqualTo(3);
         assertThat(stamps(luciaCard)).isEqualTo(1);
+    }
+
+    @Test
+    void rankingCuentaTodasLasInvitaciones() throws Exception {
+        Shop shop = shop(null, true);
+        for (String[] person : new String[][]{{"Ana Ríos", "987200100"}, {"Beto Paz", "987200200"}, {"Carla Soto", "987200300"}}) {
+            join(shop, person[0], person[1], null).andExpect(status().isCreated());
+        }
+        // Ana invitó a 120 (más de las 100 de una página) sin convertir; Beto y Carla convirtieron 3; Carla además tiene 1 pendiente.
+        invite(shop, "Ana Ríos", 120, "PENDING");
+        invite(shop, "Beto Paz", 3, "REWARDED");
+        invite(shop, "Carla Soto", 3, "LIMIT_REACHED");
+        invite(shop, "Carla Soto", 1, "PENDING");
+
+        JsonNode ranking = read(get("/api/v1/referrals/ranking"), shop.token());
+        assertThat(ranking).hasSize(3);
+        assertThat(ranking.at("/0/name").asText()).isEqualTo("Carla Soto");
+        assertThat(ranking.at("/0/converted").asLong()).isEqualTo(3);
+        assertThat(ranking.at("/0/invited").asLong()).isEqualTo(4);
+        assertThat(ranking.at("/1/name").asText()).isEqualTo("Beto Paz");
+        assertThat(ranking.at("/2/name").asText()).isEqualTo("Ana Ríos");
+        assertThat(ranking.at("/2/invited").asLong()).isEqualTo(120);
+        assertThat(ranking.at("/0/id").asLong()).isEqualTo(customerId(shop, "Carla Soto"));
+
+        assertThat(read(get("/api/v1/referrals/ranking").param("limit", "1"), shop.token())).hasSize(1);
+        assertThat(read(get("/api/v1/referrals/ranking").param("from", TODAY).param("to", TODAY), shop.token())).hasSize(3);
+        String yesterday = java.time.LocalDate.parse(TODAY).minusDays(1).toString();
+        assertThat(read(get("/api/v1/referrals/ranking").param("from", yesterday).param("to", yesterday), shop.token())).isEmpty();
+        call(get("/api/v1/referrals/ranking").param("limit", "0"), shop.token()).andExpect(status().isBadRequest());
+        call(get("/api/v1/referrals/ranking").param("limit", "51"), shop.token()).andExpect(status().isBadRequest());
+
+        // Cada negocio ve solo su ranking.
+        Shop other = shop(null, true);
+        assertThat(read(get("/api/v1/referrals/ranking"), other.token())).isEmpty();
+        call(delete("/api/v1/account"), other.token()).andExpect(status().isNoContent());
+        call(delete("/api/v1/account"), shop.token()).andExpect(status().isNoContent());
+    }
+
+    /** Crea invitaciones ya hechas por un cliente (amigos nuevos del mismo local) con el estado indicado. */
+    private void invite(Shop shop, String referrerName, int count, String status) {
+        Long referrerId = customerId(shop, referrerName);
+        tx.executeWithoutResult(s -> {
+            Customer referrer = em.find(Customer.class, referrerId);
+            LoyaltyProgram program = em.find(LoyaltyProgram.class, shop.programId());
+            for (int i = 0; i < count; i++) {
+                Customer friend = new Customer();
+                friend.setFullName("Amigo " + i);
+                friend.setEmail("amigo" + i + "." + UUID.randomUUID().toString().substring(0, 8) + "@correo.pe");
+                friend.setBranch(referrer.getBranch());
+                friend.setBusiness(referrer.getBusiness());
+                em.persist(friend);
+                Referral referral = new Referral();
+                referral.setReferrer(referrer);
+                referral.setReferred(friend);
+                referral.setProgram(program);
+                referral.setBusiness(referrer.getBusiness());
+                referral.setStatus(status);
+                if (!"PENDING".equals(status)) referral.setConvertedAt(Instant.now());
+                em.persist(referral);
+            }
+        });
     }
 
     @Test

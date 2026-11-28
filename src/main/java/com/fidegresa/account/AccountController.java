@@ -69,8 +69,9 @@ public class AccountController {
                 "delete from Branch b where b.business.id = :id"};
         // Promociones: sus destinatarios apuntan a clientes y la promoción a un programa.
         // Encuestas y resúmenes: apuntan a reseñas, clientes y locales.
-        for (String entity : new String[]{"WalletMessage", "PromotionRecipient", "Promotion", "SurveyInvitation", "SurveySettings", "ReviewSummary",
-                "EmailSend", "EmailCampaign", "EmailAutomation", "SegmentSettings", "Referral", "ReferralSettings", "ReferralLinkStat"}) {
+        for (String entity : new String[]{"WalletMessage", "PromotionRecipient", "Promotion", "SurveyOrderItem", "SurveyInvitation",
+                "SurveySettings", "ReviewSummary", "EmailSend", "EmailCampaign", "EmailAutomation", "SegmentSettings", "Referral",
+                "ReferralSettings", "ReferralLinkStat"}) {
             entityManager.createQuery("delete from " + entity + " x where x.business.id = :id").setParameter("id", businessId).executeUpdate();
         }
         entityManager.createQuery("delete from BusinessReferral r where r.referrer.id = :id or r.referred.id = :id")

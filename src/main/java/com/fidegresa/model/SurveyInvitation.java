@@ -43,6 +43,10 @@ public class SurveyInvitation {
     @Column(name = "answered_at")
     private Instant answeredAt;
 
+    /** Respuesta libre a "¿Qué pediste?" (opcional, hasta 120 caracteres). */
+    @Column(name = "order_note", length = 120)
+    private String orderNote;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "review_id")
     private Review review;

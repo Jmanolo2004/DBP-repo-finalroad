@@ -63,6 +63,7 @@ public class PublicMenuService {
     private final String consentVersion;
     private final String webUrl;
 
+    private final com.fidegresa.repository.MenuProductRepository products;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final com.fidegresa.referral.ReferralService referrals;
     private final com.fidegresa.referral.ReferralCodes referralCodes;
@@ -74,7 +75,8 @@ public class PublicMenuService {
                              @Value("${app.public.web-url:}") String webUrl,
                              org.springframework.context.ApplicationEventPublisher events,
                              @org.springframework.context.annotation.Lazy com.fidegresa.referral.ReferralService referrals,
-                             com.fidegresa.referral.ReferralCodes referralCodes) {
+                             com.fidegresa.referral.ReferralCodes referralCodes,
+                             com.fidegresa.repository.MenuProductRepository products) {
         this.branches = branches;
         this.catalogs = catalogs;
         this.catalogFiles = catalogFiles;
@@ -90,6 +92,7 @@ public class PublicMenuService {
         this.events = events;
         this.referrals = referrals;
         this.referralCodes = referralCodes;
+        this.products = products;
         this.webUrl = webUrl == null ? "" : webUrl.trim().replaceAll("/+$", "");
     }
 
@@ -128,12 +131,21 @@ public class PublicMenuService {
 
         return new MenuResponse(branch.getPublicSlug(), new BusinessInfo(business.getName(), business.getPrimaryColor()),
                 new BranchInfo(branch.getName(), branch.getCategory(), branch.getAddress(), branch.getDistrict(), branch.getSchedule()),
-                pdf, web, invitation, offered, new ConsentInfo(consentVersion, consentText(business)));
+                pdf, web, invitation, offered, new ConsentInfo(consentVersion, consentText(business)), menuProducts(branch.getId()));
+    }
+
+    /** Carta oficial del local para el menú público y la encuesta ("¿qué pediste?"). */
+    @Transactional(readOnly = true)
+    public List<ProductInfo> menuProducts(Long branchId) {
+        return products.findByBranchIdOrderByPositionAscIdAsc(branchId).stream()
+                .map(product -> new ProductInfo(product.getId(), product.getName(), product.getDescription(), product.getPrice(),
+                        product.isInStock(), product.getImage() == null ? null : fileUrl(product.getImage())))
+                .toList();
     }
 
     /**
-     * Archivo público: solo si es del catálogo PDF activo de un local activo, o la imagen de una invitación vigente.
-     * Cualquier otro archivo (aunque exista) responde 404.
+     * Archivo público: solo si es del catálogo PDF activo de un local activo, la imagen de una invitación vigente o la foto de
+     * un producto de la carta de un local activo. Cualquier otro archivo (aunque exista) responde 404.
      */
     @Transactional(readOnly = true)
     public ResponseEntity<StreamingResponseBody> file(Long fileId, String ifNoneMatch) {
@@ -145,6 +157,10 @@ public class PublicMenuService {
             allowed = invitations.findByImageId(fileId)
                     .filter(invitation -> invitation.getBranch().isActive() && invitationService.live(invitation.getBranch()).isPresent())
                     .map(BranchInvitation::getImage);
+        }
+        if (allowed.isEmpty()) {
+            allowed = products.findFirstByImageId(fileId).filter(product -> product.getBranch().isActive())
+                    .map(com.fidegresa.model.MenuProduct::getImage);
         }
         StoredFile file = allowed.orElseThrow(() -> ApiException.notFound("Archivo no encontrado."));
         return storedFiles.serve(file, ifNoneMatch);

@@ -180,6 +180,67 @@ class ReferralTest {
     }
 
     @Test
+    void rankingCuentaTodasLasInvitaciones() throws Exception {
+        Shop shop = shop(null, true);
+        for (String[] person : new String[][]{{"Ana Ríos", "987200100"}, {"Beto Paz", "987200200"}, {"Carla Soto", "987200300"}}) {
+            join(shop, person[0], person[1], null).andExpect(status().isCreated());
+        }
+        // Ana invitó a 120 (más de las 100 de una página) sin convertir; Beto y Carla convirtieron 3; Carla además tiene 1 pendiente.
+        invite(shop, "Ana Ríos", 120, "PENDING");
+        invite(shop, "Beto Paz", 3, "REWARDED");
+        invite(shop, "Carla Soto", 3, "LIMIT_REACHED");
+        invite(shop, "Carla Soto", 1, "PENDING");
+
+        JsonNode ranking = read(get("/api/v1/referrals/ranking"), shop.token());
+        assertThat(ranking).hasSize(3);
+        assertThat(ranking.at("/0/name").asText()).isEqualTo("Carla Soto");
+        assertThat(ranking.at("/0/converted").asLong()).isEqualTo(3);
+        assertThat(ranking.at("/0/invited").asLong()).isEqualTo(4);
+        assertThat(ranking.at("/1/name").asText()).isEqualTo("Beto Paz");
+        assertThat(ranking.at("/2/name").asText()).isEqualTo("Ana Ríos");
+        assertThat(ranking.at("/2/invited").asLong()).isEqualTo(120);
+        assertThat(ranking.at("/0/id").asLong()).isEqualTo(customerId(shop, "Carla Soto"));
+
+        assertThat(read(get("/api/v1/referrals/ranking").param("limit", "1"), shop.token())).hasSize(1);
+        assertThat(read(get("/api/v1/referrals/ranking").param("from", TODAY).param("to", TODAY), shop.token())).hasSize(3);
+        String yesterday = java.time.LocalDate.parse(TODAY).minusDays(1).toString();
+        assertThat(read(get("/api/v1/referrals/ranking").param("from", yesterday).param("to", yesterday), shop.token())).isEmpty();
+        call(get("/api/v1/referrals/ranking").param("limit", "0"), shop.token()).andExpect(status().isBadRequest());
+        call(get("/api/v1/referrals/ranking").param("limit", "51"), shop.token()).andExpect(status().isBadRequest());
+
+        // Cada negocio ve solo su ranking.
+        Shop other = shop(null, true);
+        assertThat(read(get("/api/v1/referrals/ranking"), other.token())).isEmpty();
+        call(delete("/api/v1/account"), other.token()).andExpect(status().isNoContent());
+        call(delete("/api/v1/account"), shop.token()).andExpect(status().isNoContent());
+    }
+
+    /** Crea invitaciones ya hechas por un cliente (amigos nuevos del mismo local) con el estado indicado. */
+    private void invite(Shop shop, String referrerName, int count, String status) {
+        Long referrerId = customerId(shop, referrerName);
+        tx.executeWithoutResult(s -> {
+            Customer referrer = em.find(Customer.class, referrerId);
+            LoyaltyProgram program = em.find(LoyaltyProgram.class, shop.programId());
+            for (int i = 0; i < count; i++) {
+                Customer friend = new Customer();
+                friend.setFullName("Amigo " + i);
+                friend.setEmail("amigo" + i + "." + UUID.randomUUID().toString().substring(0, 8) + "@correo.pe");
+                friend.setBranch(referrer.getBranch());
+                friend.setBusiness(referrer.getBusiness());
+                em.persist(friend);
+                Referral referral = new Referral();
+                referral.setReferrer(referrer);
+                referral.setReferred(friend);
+                referral.setProgram(program);
+                referral.setBusiness(referrer.getBusiness());
+                referral.setStatus(status);
+                if (!"PENDING".equals(status)) referral.setConvertedAt(Instant.now());
+                em.persist(referral);
+            }
+        });
+    }
+
+    @Test
     void topeMensualYConfiguracionDelPremio() throws Exception {
         Shop shop = shop(null, true);
         JsonNode settings = read(get("/api/v1/referrals/settings"), shop.token());

@@ -77,6 +77,45 @@ class PublicMenuControllerTest {
     }
 
     @Test
+    void elMenuMuestraLosProductosConFoto() throws Exception {
+        String base = "/api/v1/branches/" + branchId() + "/products";
+        long withPhoto = read(post(base).contentType(MediaType.APPLICATION_JSON)
+                .content(json(Map.of("name", "Torta de lúcuma", "description", "Porción", "price", 12.5))), token).get("id").asLong();
+        read(multipart(base + "/" + withPhoto + "/image").file(new MockMultipartFile("file", "torta.png", "image/png", PNG)), token);
+        long soldOut = read(post(base).contentType(MediaType.APPLICATION_JSON)
+                .content(json(Map.of("name", "Pie de limón", "price", 9))), token).get("id").asLong();
+        read(patch(base + "/" + soldOut + "/stock").contentType(MediaType.APPLICATION_JSON).content("{\"inStock\":false}"), token);
+
+        // Misma carta y mismo orden que en el panel.
+        JsonNode panel = read(get(base), token);
+        JsonNode products = publicGet("/api/v1/public/menus/" + slug).get("products");
+        assertThat(products).hasSize(panel.size());
+        for (int i = 0; i < panel.size(); i++) assertThat(products.get(i).get("id").asLong()).isEqualTo(panel.get(i).get("id").asLong());
+
+        JsonNode torta = find(products, withPhoto);
+        assertThat(torta.get("name").asText()).isEqualTo("Torta de lúcuma");
+        assertThat(torta.get("price").decimalValue()).isEqualByComparingTo("12.50");
+        assertThat(torta.get("inStock").asBoolean()).isTrue();
+        assertThat(torta.get("imageUrl").asText()).startsWith("/api/v1/public/menu-files/");
+        JsonNode pie = find(products, soldOut);
+        assertThat(pie.get("inStock").asBoolean()).isFalse();
+        assertThat(pie.get("imageUrl").isNull()).isTrue();
+
+        // La foto se sirve sin sesión; al borrar el producto deja de servirse.
+        String photo = torta.get("imageUrl").asText();
+        var started = mvc.perform(get(photo).with(ip())).andExpect(request().asyncStarted()).andReturn();
+        mvc.perform(asyncDispatch(started)).andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        mvc.perform(delete(base + "/" + withPhoto).header("Authorization", token)).andExpect(status().isNoContent());
+        mvc.perform(get(photo).with(ip())).andExpect(status().isNotFound());
+        mvc.perform(delete(base + "/" + soldOut).header("Authorization", token)).andExpect(status().isNoContent());
+    }
+
+    private static JsonNode find(JsonNode items, long id) {
+        for (JsonNode item : items) if (item.get("id").asLong() == id) return item;
+        throw new AssertionError("No está el producto " + id);
+    }
+
+    @Test
     void elMenuMuestraSoloLoActivo() throws Exception {
         String base = "/api/v1/branches/" + branchId();
         read(multipart(base + "/catalogs/pdf/files").file(new MockMultipartFile("file", "carta.pdf", "application/pdf", "%PDF-1.4 carta".getBytes())), token);
